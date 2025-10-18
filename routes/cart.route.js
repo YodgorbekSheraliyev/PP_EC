@@ -1,0 +1,151 @@
+const Cart = require("../models/Cart");
+const Product = require("../models/Product");
+const { validateCartItem, sanitizeInput } = require("../middleware/validation");
+const { requireAuth } = require("../middleware/auth");
+const { Router } = require("express");
+
+const router = Router();
+
+// All cart routes require authentication
+router.use(requireAuth);
+
+// Get cart
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const cartItems = await Cart.getCart(req.session.user.id);
+    const total = await Cart.getCartTotal(req.session.user.id);
+    const itemCount = await Cart.getCartItemCount(req.session.user.id);
+
+    res.render("cart/index", {
+      cartItems,
+      total,
+      itemCount,
+      user: req.session.user,
+    });
+  } catch (error) {
+    console.error("Error fetching cart:", error);
+    res.render("error", { message: "Error loading cart" });
+  }
+});
+
+// Add item to cart
+router.post(
+  "/add",
+  requireAuth,
+  sanitizeInput,
+  validateCartItem,
+  async (req, res) => {
+    try {
+      const { product_id, quantity } = req.body;
+      const userId = req.session.user.id;
+
+      // Check if product exists and has sufficient stock
+      const product = await Product.findByPk(product_id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.stock_quantity < quantity) {
+        return res.status(400).json({ message: "Insufficient stock" });
+      }
+
+      await Cart.addItem(userId, product_id, quantity);
+      const itemCount = await Cart.getCartItemCount(userId);
+
+      res.json({ message: "Item added to cart", itemCount });
+    } catch (error) {
+      console.error("Error adding item to cart:", error);
+      res.status(500).json({ message: "Error adding item to cart" });
+    }
+  }
+);
+
+// Update cart item quantity
+router.post(
+  "/:productId/update",
+  requireAuth,
+  sanitizeInput,
+  async (req, res) => {
+    try {
+      const { quantity } = req.body;
+      const userId = req.session.user.id;
+      const productId = req.params.productId;
+
+      // Validate quantity
+      const qty = parseInt(quantity);
+      if (isNaN(qty) || qty < 0) {
+        return res.status(400).json({ message: "Invalid quantity" });
+      }
+
+      // Check stock if increasing quantity
+      if (qty > 0) {
+        const product = await Product.findById(productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        const currentCartItem = await Cart.getCart(userId);
+        const currentQty =
+          currentCartItem.find((item) => item.product_id == productId)
+            ?.quantity || 0;
+
+        if (product.stock_quantity < qty - currentQty) {
+          return res.status(400).json({ message: "Insufficient stock" });
+        }
+      }
+
+      await Cart.updateQuantity(userId, productId, qty);
+      const itemCount = await Cart.getCartItemCount(userId);
+
+      res.json({ message: "Cart updated", itemCount });
+    } catch (error) {
+      console.error("Error updating cart:", error);
+      res.status(500).json({ message: "Error updating cart" });
+    }
+  }
+);
+
+// Remove item from cart
+router.post("/:productId/remove", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const productId = req.params.productId;
+
+    await Cart.removeItem(userId, productId);
+    const itemCount = await Cart.getCartItemCount(userId);
+
+    res.json({ message: "Item removed from cart", itemCount });
+  } catch (error) {
+    console.error("Error removing item from cart:", error);
+    res.status(500).json({ message: "Error removing item from cart" });
+  }
+});
+
+// Clear cart
+router.post("/clear", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+
+    await Cart.clearCart(userId);
+
+    res.json({ message: "Cart cleared" });
+  } catch (error) {
+    console.error("Error clearing cart:", error);
+    res.status(500).json({ message: "Error clearing cart" });
+  }
+});
+
+// Get cart summary (for AJAX updates)
+router.get("/summary", requireAuth, async (req, res) => {
+  try {
+    const total = await Cart.getCartTotal(req.session.user.id);
+    const itemCount = await Cart.getCartItemCount(req.session.user.id);
+
+    res.json({ total, itemCount });
+  } catch (error) {
+    console.error("Error getting cart summary:", error);
+    res.status(500).json({ message: "Error getting cart summary" });
+  }
+});
+
+module.exports = router;
