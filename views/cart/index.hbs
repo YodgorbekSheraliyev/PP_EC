@@ -23,15 +23,19 @@
                         <div class="row">
                             <div class="col-md-2">
                                 {{#if product.image_url}}
-                                <img src="{{product.image_url}}" class="img-fluid rounded" alt="{{product.name}}" style="max-height: 80px;">
+                                <a href="/products/{{product_id}}" class="text-decoration-none">
+                                    <img src="{{product.image_url}}" class="img-fluid rounded" alt="{{product.name}}" style="max-height: 80px;">
+                                </a>
                                 {{else}}
-                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 80px; width: 80px;">
-                                    <small class="text-muted">No Image</small>
-                                </div>
+                                <a href="/products/{{product_id}}" class="text-decoration-none">
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 80px; width: 80px;">
+                                        <small class="text-muted">No Image</small>
+                                    </div>
+                                </a>
                                 {{/if}}
                             </div>
                             <div class="col-md-4">
-                                <h5>{{product.name}}</h5>
+                                <h5><a href="/products/{{product_id}}" class="text-decoration-none text-dark">{{product.name}}</a></h5>
                                 <p class="text-muted">${{product.price}} each</p>
                             </div>
                             <div class="col-md-3">
@@ -42,7 +46,7 @@
                                 </div>
                             </div>
                             <div class="col-md-2">
-                                <p class="mb-0"><strong>${{multiply product.price quantity}}</strong></p>
+                                <p class="mb-0"><strong>${{formatPrice (multiply product.price quantity)}}</strong></p>
                             </div>
                             <div class="col-md-1 d-flex align-items-center">
                                 <button class="btn btn-danger btn-md remove-item w-100 h-50" data-product-id="{{product_id}}"><i class="bi bi-trash"></i></button>
@@ -64,7 +68,7 @@
                         </div>
                         <div class="d-flex justify-content-between mt-2">
                             <strong>Total:</strong>
-                            <strong>${{total}}</strong>
+                            <strong>${{formatPrice total}}</strong>
                         </div>
                         <a href="/orders/checkout" class="btn btn-success w-100 mt-3">Proceed to Checkout</a>
                     </div>
@@ -81,6 +85,16 @@
     </div>
 
     {{> footer}}
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -117,10 +131,10 @@
                             location.reload();
                         }
                     } else {
-                        alert(data.message || 'Error updating cart');
+                        showToast(data.message || 'Error updating cart');
                     }
                 } catch (error) {
-                    alert('Error updating cart');
+                    showToast('Error updating cart');
                 }
             });
         });
@@ -139,10 +153,10 @@
                             updateCartCount(data.itemCount);
                             location.reload(); // Reload to update display
                         } else {
-                            alert(data.message || 'Error removing item');
+                            showToast(data.message || 'Error removing item');
                         }
                     } catch (error) {
-                        alert('Error removing item');
+                        showToast('Error removing item');
                     }
                 }
             });
@@ -171,11 +185,11 @@
                             location.reload();
                         }
                     } else {
-                        alert(data.message || 'Error updating cart');
+                        showToast(data.message || 'Error updating cart');
                         e.target.value = e.target.defaultValue; // Reset to original value
                     }
                 } catch (error) {
-                    alert('Error updating cart');
+                    showToast('Error updating cart');
                     e.target.value = e.target.defaultValue;
                 }
             });
@@ -186,6 +200,13 @@
             if (cartCount) {
                 cartCount.textContent = count;
             }
+        }
+
+        function showToast(message) {
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = message;
+            const toast = new bootstrap.Toast(document.getElementById('errorToast'));
+            toast.show();
         }
     </script>
 </body>

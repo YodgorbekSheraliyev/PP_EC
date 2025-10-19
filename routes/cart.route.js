@@ -1,8 +1,8 @@
+ const { Router } = require("express");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { validateCartItem, sanitizeInput } = require("../middleware/validation");
 const { requireAuth } = require("../middleware/auth");
-const { Router } = require("express");
 
 const router = Router();
 
@@ -29,12 +29,7 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // Add item to cart
-router.post(
-  "/add",
-  requireAuth,
-  sanitizeInput,
-  validateCartItem,
-  async (req, res) => {
+router.post("/add", requireAuth, sanitizeInput, validateCartItem,  async (req, res) => {
     try {
       const { product_id, quantity } = req.body;
       const userId = req.session.user.id;
@@ -50,6 +45,10 @@ router.post(
       }
 
       await Cart.addItem(userId, product_id, quantity);
+      // Decrease stock quantity
+      product.stock_quantity -= quantity;
+      await product.save();
+
       const itemCount = await Cart.getCartItemCount(userId);
 
       res.json({ message: "Item added to cart", itemCount });
@@ -61,11 +60,7 @@ router.post(
 );
 
 // Update cart item quantity
-router.post(
-  "/:productId/update",
-  requireAuth,
-  sanitizeInput,
-  async (req, res) => {
+router.post("/:productId/update", requireAuth, sanitizeInput, async (req, res) => {
     try {
       const { quantity } = req.body;
       const userId = req.session.user.id;
@@ -77,6 +72,12 @@ router.post(
         return res.status(400).json({ message: "Invalid quantity" });
       }
 
+      // Get current cart item to calculate stock adjustment
+      const currentCartItem = await Cart.findOne({
+        where: { user_id: userId, product_id: productId }
+      });
+      const currentQty = currentCartItem ? currentCartItem.quantity : 0;
+
       // Check stock if increasing quantity
       if (qty > 0) {
         const product = await Product.findByPk(productId);
@@ -84,13 +85,20 @@ router.post(
           return res.status(404).json({ message: "Product not found" });
         }
 
-        const currentCartItem = await Cart.getCart(userId);
-        const currentQty =
-          currentCartItem.find((item) => item.product_id == productId)
-            ?.quantity || 0;
-
-        if (product.stock_quantity < qty - currentQty) {
+        const quantityDifference = qty - currentQty;
+        if (product.stock_quantity < quantityDifference) {
           return res.status(400).json({ message: "Insufficient stock" });
+        }
+
+        // Adjust stock quantity
+        product.stock_quantity -= quantityDifference;
+        await product.save();
+      } else if (qty === 0) {
+        // If removing item, restore stock
+        const product = await Product.findByPk(productId);
+        if (product) {
+          product.stock_quantity += currentQty;
+          await product.save();
         }
       }
 
@@ -111,6 +119,20 @@ router.post("/:productId/remove", requireAuth, async (req, res) => {
     const userId = req.session.user.id;
     const productId = req.params.productId;
 
+    // Get current cart item quantity before removing to restore stock
+    const currentCartItem = await Cart.findOne({
+      where: { user_id: userId, product_id: productId }
+    });
+
+    if (currentCartItem) {
+      // Restore stock quantity
+      const product = await Product.findByPk(productId);
+      if (product) {
+        product.stock_quantity += currentCartItem.quantity;
+        await product.save();
+      }
+    }
+
     await Cart.removeItem(userId, productId);
     const itemCount = await Cart.getCartItemCount(userId);
 
@@ -125,6 +147,18 @@ router.post("/:productId/remove", requireAuth, async (req, res) => {
 router.post("/clear", requireAuth, async (req, res) => {
   try {
     const userId = req.session.user.id;
+
+    // Get all cart items before clearing to restore stock
+    const cartItems = await Cart.getCart(userId);
+
+    // Restore stock for all items
+    for (const item of cartItems) {
+      const product = await Product.findByPk(item.product_id);
+      if (product) {
+        product.stock_quantity += item.quantity;
+        await product.save();
+      }
+    }
 
     await Cart.clearCart(userId);
 

@@ -10,13 +10,23 @@
 <body>
     {{> header}}
 
-    <!-- Toast notification -->
+    <!-- Toast notifications -->
     <div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 11">
         <div id="cart-toast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
                     Product added to cart!
                 </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="errorToastMessage"></div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
@@ -57,7 +67,7 @@
                     <div class="col-md-4 mb-4">
                         <div class="card h-100">
                             {{#if image_url}}
-                                <img src="{{image_url}}" class="card-img-top" alt="{{name}}" style="height: 200px; object-fit: cover;">
+                                <img src="{{image_url}}" class="card-img-top" alt="{{name}}" style="height: 200px; object-fit: cover; transition: transform 0.2s;">
                             {{else}}
                                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
                                     <span class="text-muted">No Image</span>
@@ -144,11 +154,12 @@
                         updateCartCount(data.itemCount);
                         const toast = new bootstrap.Toast(document.getElementById('cart-toast'));
                         toast.show();
+                        location.reload()
                     } else {
-                        alert(data.message || 'Error adding to cart');
+                        showErrorToast(data.message || 'Error adding to cart');
                     }
                 } catch (error) {
-                    alert('Error adding to cart');
+                    showErrorToast('Error adding to cart');
                 }
             });
         });
@@ -162,6 +173,13 @@
 
         // Initialize cart count when page loads
         document.addEventListener('DOMContentLoaded', initializeCartCount);
+
+        function showErrorToast(message) {
+            const errorToastMessage = document.getElementById('errorToastMessage');
+            errorToastMessage.textContent = message;
+            const toast = new bootstrap.Toast(document.getElementById('errorToast'));
+            toast.show();
+        }
     </script>
 </body>
 </html>

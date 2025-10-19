@@ -14,3 +14,6 @@ hbs.registerHelper("formatDate", (date) => {
   if(!date) return '';
   return new Date(date).toLocaleDateString('en-GB', {'day': "numeric", "month" :'long', 'year': 'numeric'}).replace(' ', '-')
 })
+hbs.registerHelper("formatPrice", (price) => {
+  return parseFloat(price).toFixed(2);
+})

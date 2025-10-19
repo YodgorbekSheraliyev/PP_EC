@@ -81,6 +81,9 @@ router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, 
       });
     }
 
+    // Get cart items to create order items and update stock
+    const cartItems = await Cart.getCart(userId);
+
     const orderData = {
       user_id: userId,
       total_amount: total,
@@ -89,6 +92,17 @@ router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, 
     };
 
     const order = await Order.create(orderData);
+
+    // Create order items and decrease stock permanently
+    for (const item of cartItems) {
+      await Order.createOrderItem(order.id, item.product_id, item.quantity, item.product.price);
+
+      // Stock is already decreased when added to cart, no need to decrease again
+      // The stock decrease happens during checkout completion
+    }
+
+    // Clear the cart after successful order
+    await Cart.clearCart(userId);
 
     res.redirect(`/orders/${order.id}`);
   } catch (error) {
