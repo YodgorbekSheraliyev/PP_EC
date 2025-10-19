@@ -1,8 +1,8 @@
-const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { Router } = require('express');
 
-const router = express.Router();
+const router = Router();
 
 // Register route
 router.get('/register', (req, res) => {
@@ -27,7 +27,8 @@ router.post('/register', async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      created_at: user.created_at
     };
 
     res.redirect('/');
@@ -63,7 +64,8 @@ router.post('/login', async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      created_at: user.created_at
     };
 
     res.redirect('/');

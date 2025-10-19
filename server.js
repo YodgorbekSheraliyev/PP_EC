@@ -63,11 +63,29 @@ hbs.registerPartials(path.join(__dirname, "views/partials"))
 // Static files
 app.use(express.static(path.join(__dirname, "public")))
 
+// Middleware to set cart item count for authenticated users
+app.use(async (req, res, next) => {
+  if (req.session.user) {
+    const Cart = require('./models/Cart');
+    try {
+      const itemCount = await Cart.getCartItemCount(req.session.user.id);
+      res.locals.itemCount = itemCount;
+    } catch (error) {
+      console.error('Error fetching cart count:', error);
+      res.locals.itemCount = 0;
+    }
+  } else {
+    res.locals.itemCount = 0;
+  }
+  next();
+});
+
 // Routes
 app.use('/products', require('./routes/product.route'))
 app.use('/auth', require('./routes/auth.route'))
 app.use('/admin', require('./routes/admin.route'))
 app.use('/cart', require('./routes/cart.route'))
+app.use('/orders', require('./routes/order.route'))
 
 // Home route
 app.get('/', (req, res) => {

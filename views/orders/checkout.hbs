@@ -58,7 +58,7 @@
                         {{#each cartItems}}
                         <div class="d-flex justify-content-between mb-2">
                             <span>{{name}} (x{{quantity}})</span>
-                            <span>${{total_price}}</span>
+                            <span>${{multiply quantity product.price}}</span>
                         </div>
                         {{/each}}
                         <hr>

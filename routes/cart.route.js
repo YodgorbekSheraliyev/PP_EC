@@ -79,7 +79,7 @@ router.post(
 
       // Check stock if increasing quantity
       if (qty > 0) {
-        const product = await Product.findById(productId);
+        const product = await Product.findByPk(productId);
         if (!product) {
           return res.status(404).json({ message: "Product not found" });
         }
