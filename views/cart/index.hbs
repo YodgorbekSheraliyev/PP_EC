@@ -142,7 +142,7 @@
         // Remove item functionality
         document.querySelectorAll('.remove-item').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const productId = e.target.dataset.productId;
+                const productId = e.currentTarget.dataset.productId;
                 if (confirm('Remove this item from cart?')) {
                     try {
                         const response = await fetch(`/cart/${productId}/remove`, {
@@ -186,7 +186,7 @@
                         }
                     } else {
                         showToast(data.message || 'Error updating cart');
-                        e.target.value = e.target.defaultValue; // Reset to original value
+                        e.target.value = e.target.defaultValue;
                     }
                 } catch (error) {
                     showToast('Error updating cart');

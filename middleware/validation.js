@@ -76,7 +76,7 @@ const validateCartItem = [
   handleValidationErrors
 ];
 
-// Validation rules for order creation
+// Validation rules for order creation (without error handling for form rendering)
 const validateOrder = [
   body('shipping_address')
     .trim()
@@ -84,8 +84,7 @@ const validateOrder = [
     .withMessage('Shipping address must be between 10 and 500 characters'),
   body('payment_method')
     .isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer'])
-    .withMessage('Invalid payment method'),
-  handleValidationErrors
+    .withMessage('Invalid payment method')
 ];
 
 // Sanitization middleware

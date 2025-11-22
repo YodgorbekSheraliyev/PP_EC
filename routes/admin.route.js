@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
@@ -45,7 +46,7 @@ router.get("/", async (req, res) => {
       user: req.session.user,
     });
   } catch (error) {
-    console.error("Error loading admin dashboard:", error);
+    logger.error("Error loading admin dashboard: %o", error);
     res.render("error", { message: "Error loading dashboard" });
   }
 });
@@ -59,7 +60,7 @@ router.get("/users", async (req, res) => {
     });
     res.render("admin/users/index", { users: users, user: req.session.user });
   } catch (error) {
-    console.error("Error fetching users:", error);
+    logger.error("Error fetching users: %o", error);
     res.render("error", { message: "Error loading users" });
   }
 });
@@ -79,7 +80,7 @@ router.post("/users/:id/role", async (req, res) => {
     );
     res.json({ message: "User role updated" });
   } catch (error) {
-    console.error("Error updating user role:", error);
+    logger.error("Error updating user role: %o", error);
     res.status(500).json({ message: "Error updating user role" });
   }
 });
@@ -169,36 +170,83 @@ router.get("/analytics", async (req, res) => {
       user: req.session.user,
     });
   } catch (error) {
-    console.error("Error loading analytics:", error);
+    logger.error("Error loading analytics: %o", error);
     res.render("error", { message: "Error loading analytics" });
   }
 });
 
-// Security logs (placeholder for future implementation)
-router.get("/logs", (req, res) => {
-  // In a real application, you'd fetch logs from a logging service
-  const logs = [
-    {
-      timestamp: new Date(),
-      action: "User login",
-      user: "john@example.com",
-      ip: "192.168.1.1",
-    },
-    {
-      timestamp: new Date(),
-      action: "Failed login attempt",
-      user: "unknown",
-      ip: "10.0.0.1",
-    },
-    {
-      timestamp: new Date(),
-      action: "Product created",
-      user: "admin@example.com",
-      ip: "192.168.1.1",
-    },
-  ];
+// Security logs (real implementation reading from log files)
+const fs = require('fs');
+const path = require('path');
 
-  res.render("admin/logs", { logs, user: req.session.user });
+router.get("/logs", (req, res) => {
+  const logDir = path.join(__dirname, '../logs');
+  fs.readdir(logDir, (err, files) => {
+    if (err) {
+      logger.error('Error reading log directory: %o', err);
+      return res.render('error', { message: 'Error loading logs' });
+    }
+    // Read last 5 lines of the most recent log file
+    const logFiles = files.filter(file => file.startsWith('application-')).sort().reverse();
+    if (logFiles.length === 0) {
+      return res.render('admin/logs', { logs: [], user: req.session.user });
+    }
+    const latestLogFile = path.join(logDir, logFiles[0]);
+    fs.readFile(latestLogFile, 'utf8', (err, data) => {
+      if (err) {
+        logger.error('Error reading log file: %o', err);
+        return res.render('error', { message: 'Error loading logs' });
+      }
+      const logLines = data.trim().split('\\n').slice(-50).map(line => {
+        try {
+          const logEntry = JSON.parse(line);
+
+          // Transform log entry to template expected format
+          const transformed = {
+            timestamp: logEntry.timestamp || '',
+            action: '',
+            user: '',
+            ip: '',
+            details: ''
+          };
+
+          // Use level and message to determine action/details
+          if (logEntry.message) {
+            transformed.details = logEntry.message;
+            if (logEntry.message.toLowerCase().includes('login')) {
+              transformed.action = 'User login';
+            } else if (logEntry.message.toLowerCase().includes('failed login attempt')) {
+              transformed.action = 'Failed login attempt';
+            } else if (logEntry.message.toLowerCase().includes('logout')) {
+              transformed.action = 'User logout';
+            } else if (logEntry.level) {
+              transformed.action = logEntry.level.toUpperCase();
+            } else {
+              transformed.action = 'Info';
+            }
+
+            // Try to parse user and IP from message if present
+            const userMatch = logEntry.message.match(/(?:user|email):\s*([\w@.]+)/i);
+            const ipMatch = logEntry.message.match(/ip:\s*([\d.]+)/i);
+            if (userMatch) {
+              transformed.user = userMatch[1];
+            }
+            if (ipMatch) {
+              transformed.ip = ipMatch[1];
+            }
+          } else {
+            transformed.action = logEntry.level ? logEntry.level.toUpperCase() : 'Info';
+            transformed.details = JSON.stringify(logEntry);
+          }
+
+          return transformed;
+        } catch (e) {
+          return { message: line };
+        }
+      });
+      res.render('admin/logs', { logs: logLines, user: req.session.user });
+    });
+  });
 });
 
 module.exports = router;

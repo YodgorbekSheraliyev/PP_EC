@@ -138,8 +138,17 @@ class Order extends Model {
       return order;
     } catch (error) {
       await transaction.rollback();
-      throw new Error('Error creating order: ' + error.message);
+      throw error; // Re-throw the original error to avoid recursive error messages
     }
+  }
+
+  static async createOrderItem(orderId, productId, quantity, price) {
+    return await this.sequelize.models.OrderItem.create({
+      order_id: orderId,
+      product_id: productId,
+      quantity,
+      price
+    });
   }
 
   static async findByUserId(userId, limit = 10, offset = 0) {

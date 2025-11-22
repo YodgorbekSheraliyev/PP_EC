@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { validationResult } = require('express-validator');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const { validateOrder, sanitizeInput } = require('../middleware/validation');
@@ -66,6 +67,20 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 
 router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    // Reload cart items for error display
+    const cartItems = await Cart.getCart(req.session.user.id);
+    const total = await Cart.getCartTotal(req.session.user.id);
+
+    return res.render('orders/checkout', {
+      cartItems,
+      total,
+      user: req.session.user,
+      errors: errors.array()
+    });
+  }
+
   try {
     const { shipping_address, payment_method } = req.body;
     const userId = req.session.user.id;
@@ -92,14 +107,6 @@ router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, 
     };
 
     const order = await Order.create(orderData);
-
-    // Create order items and decrease stock permanently
-    for (const item of cartItems) {
-      await Order.createOrderItem(order.id, item.product_id, item.quantity, item.product.price);
-
-      // Stock is already decreased when added to cart, no need to decrease again
-      // The stock decrease happens during checkout completion
-    }
 
     // Clear the cart after successful order
     await Cart.clearCart(userId);

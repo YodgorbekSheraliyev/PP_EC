@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { Router } = require('express');
+const logger = require('../utils/logger');
 
 const router = Router();
 
@@ -31,9 +32,11 @@ router.post('/register', async (req, res) => {
       created_at: user.created_at
     };
 
+    logger.info(`User registered: ${email}`);
+
     res.redirect('/');
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error: %o', error);
     res.render('auth/register', { errors: [{ msg: 'Registration failed. Please try again.' }] });
   }
 });
@@ -50,12 +53,14 @@ router.post('/login', async (req, res) => {
     // Find user
     const user = await User.findByEmail(email);
     if (!user) {
+      logger.warn(`Failed login attempt - invalid email: ${email}, IP: ${req.ip}`);
       return res.render('auth/login', { errors: [{ msg: 'Invalid email or password' }] });
     }
 
     // Verify password
     const isValidPassword = await user.verifyPassword(password);
     if (!isValidPassword) {
+      logger.warn(`Failed login attempt - invalid password: ${email}, IP: ${req.ip}`);
       return res.render('auth/login', { errors: [{ msg: 'Invalid email or password' }] });
     }
 
@@ -68,9 +73,11 @@ router.post('/login', async (req, res) => {
       created_at: user.created_at
     };
 
+    logger.info(`User logged in successfully: ${email}, IP: ${req.ip}`);
+
     res.redirect('/');
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error: %o', error);
     res.render('auth/login', { errors: [{ msg: 'Login failed. Please try again.' }] });
   }
 });
@@ -79,7 +86,9 @@ router.post('/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      console.error('Logout error:', err);
+      logger.error('Logout error: %o', err);
+    } else {
+      logger.info(`User logged out: ${req.session?.user?.email || 'unknown'}`);
     }
     res.redirect('/');
   });
@@ -104,9 +113,11 @@ router.post('/profile', async (req, res) => {
       email: updatedUser.email
     };
 
+    logger.info(`User profile updated: ${email}`);
+
     res.render('auth/profile', { user: req.session.user, errors: null, success: 'Profile updated successfully' });
   } catch (error) {
-    console.error('Profile update error:', error);
+    logger.error('Profile update error: %o', error);
     res.render('auth/profile', { user: req.session.user, errors: [{ msg: 'Profile update failed' }], success: null });
   }
 });
@@ -118,11 +129,13 @@ router.post('/api/login', async (req, res) => {
 
     const user = await User.findByEmail(email);
     if (!user) {
+      logger.warn(`API failed login attempt - invalid email: ${email}, IP: ${req.ip}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const isValidPassword = await user.verifyPassword(password);
     if (!isValidPassword) {
+      logger.warn(`API failed login attempt - invalid password: ${email}, IP: ${req.ip}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -132,9 +145,11 @@ router.post('/api/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    logger.info(`API user logged in successfully: ${email}, IP: ${req.ip}`);
+
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
   } catch (error) {
-    console.error('API login error:', error);
+    logger.error('API login error: %o', error);
     res.status(500).json({ message: 'Login failed' });
   }
 });
