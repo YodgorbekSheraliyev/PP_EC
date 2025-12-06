@@ -31,9 +31,13 @@
                     </div>
                     <div class="card-body">
                         <form id="checkout-form" action="/orders/checkout" method="POST">
+                            {{!-- CSRF Token - IMPORTANT --}}
+                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+
                             <div class="mb-3">
                                 <label for="shipping_address" class="form-label">Shipping Address</label>
-                                <textarea class="form-control" id="shipping_address" name="shipping_address" rows="4" required minlength="10" maxlength="500" placeholder="Enter your full shipping address"></textarea>
+                                <textarea class="form-control" id="shipping_address" name="shipping_address" rows="4" required minlength="10" maxlength="500" placeholder="Enter your full shipping address including street, city, postal code, and country"></textarea>
+                                <div class="form-text">Please provide complete address details (minimum 10 characters)</div>
                             </div>
                             <div class="mb-3">
                                 <label for="payment_method" class="form-label">Payment Method</label>
@@ -57,14 +61,14 @@
                     <div class="card-body">
                         {{#each cartItems}}
                         <div class="d-flex justify-content-between mb-2">
-                            <span>{{name}} (x{{quantity}})</span>
-                            <span>${{multiply quantity product.price}}</span>
+                            <span>{{product.name}} (x{{quantity}})</span>
+                            <span>${{formatPrice (multiply quantity product.price)}}</span>
                         </div>
                         {{/each}}
                         <hr>
                         <div class="d-flex justify-content-between">
                             <strong>Total:</strong>
-                            <strong>${{total}}</strong>
+                            <strong>${{formatPrice total}}</strong>
                         </div>
                         <button type="submit" form="checkout-form" class="btn btn-success w-100 mt-3">Place Order</button>
                     </div>

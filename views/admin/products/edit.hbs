@@ -29,14 +29,18 @@
                         {{/if}}
 
                         <form method="POST" action="/products/admin/{{product.id}}">
+                            {{!-- CSRF Token - IMPORTANT --}}
+                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+
                             <div class="mb-3">
                                 <label for="name" class="form-label">Product Name *</label>
-                                <input type="text" class="form-control" id="name" name="name" value="{{product.name}}" required>
+                                <input type="text" class="form-control" id="name" name="name" value="{{product.name}}" required minlength="1" maxlength="100">
                             </div>
 
                             <div class="mb-3">
-                                <label for="description" class="form-label">Description</label>
-                                <textarea class="form-control" id="description" name="description" rows="3">{{product.description}}</textarea>
+                                <label for="description" class="form-label">Description *</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" required minlength="10" maxlength="1000">{{product.description}}</textarea>
+                                <div class="form-text">Minimum 10 characters, maximum 1000 characters</div>
                             </div>
 
                             <div class="row">
@@ -73,15 +77,21 @@
                             <div class="mb-3">
                                 <label for="image_url" class="form-label">Image URL</label>
                                 <input type="url" class="form-control" id="image_url" name="image_url" value="{{product.image_url}}" placeholder="https://example.com/image.jpg">
+                                <div class="form-text">Optional: Provide a URL to an image for this product</div>
                             </div>
 
                             <div class="d-flex gap-2">
                                 <button type="submit" class="btn btn-success">Update Product</button>
                                 <a href="/products/admin" class="btn btn-secondary">Cancel</a>
-                                <form method="POST" action="/products/admin/{{product.id}}/delete" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this product?')">
-                                    <button type="submit" class="btn btn-danger">Delete</button>
-                                </form>
                             </div>
+                        </form>
+
+                        <hr class="my-4">
+
+                        <form method="POST" action="/products/admin/{{product.id}}/delete" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this product? This action cannot be undone.')">
+                            {{!-- CSRF Token for Delete - IMPORTANT --}}
+                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+                            <button type="submit" class="btn btn-danger">Delete Product</button>
                         </form>
                     </div>
                 </div>

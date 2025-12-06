@@ -1,8 +1,9 @@
- const { Router } = require("express");
+const { Router } = require("express");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { validateCartItem, sanitizeInput } = require("../middleware/validation");
 const { requireAuth } = require("../middleware/auth");
+const logger = require("../utils/logger");
 
 const router = Router();
 
@@ -10,7 +11,7 @@ const router = Router();
 router.use(requireAuth);
 
 // Get cart
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const cartItems = await Cart.getCart(req.session.user.id);
     const total = await Cart.getCartTotal(req.session.user.id);
@@ -21,163 +22,174 @@ router.get("/", requireAuth, async (req, res) => {
       total,
       itemCount,
       user: req.session.user,
+      csrfToken: req.csrfToken?.()
     });
   } catch (error) {
-    console.error("Error fetching cart:", error);
+    logger.error("Error fetching cart", {
+      userId: req.session.user.id,
+      error: error.message
+    });
     res.render("error", { message: "Error loading cart" });
   }
 });
 
 // Add item to cart
-router.post("/add", requireAuth, sanitizeInput, validateCartItem,  async (req, res) => {
-    try {
-      const { product_id, quantity } = req.body;
-      const userId = req.session.user.id;
+router.post("/add", sanitizeInput, validateCartItem, async (req, res) => {
+  try {
+    const { product_id, quantity } = req.body;
+    const userId = req.session.user.id;
 
-      // Check if product exists and has sufficient stock
-      const product = await Product.findByPk(product_id);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
-      }
-
-      if (product.stock_quantity < quantity) {
-        return res.status(400).json({ message: "Insufficient stock" });
-      }
-
-      await Cart.addItem(userId, product_id, quantity);
-      // Decrease stock quantity
-      product.stock_quantity -= quantity;
-      await product.save();
-
-      const itemCount = await Cart.getCartItemCount(userId);
-
-      res.json({ message: "Item added to cart", itemCount });
-    } catch (error) {
-      console.error("Error adding item to cart:", error);
-      res.status(500).json({ message: "Error adding item to cart" });
+    // Check if product exists and has sufficient stock
+    const product = await Product.findByPk(product_id);
+    if (!product) {
+      logger.warn(`Add to cart failed - product not found: ${product_id}`, { userId });
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    // Check if product has enough stock
+    if (product.stock_quantity < quantity) {
+      logger.warn(`Add to cart failed - insufficient stock`, {
+        userId,
+        productId: product_id,
+        requested: quantity,
+        available: product.stock_quantity
+      });
+      return res.status(400).json({
+        message: `Only ${product.stock_quantity} item(s) available in stock`
+      });
+    }
+
+    // Add to cart (this will combine with existing items if any)
+    await Cart.addItem(userId, product_id, quantity);
+
+    const itemCount = await Cart.getCartItemCount(userId);
+
+    logger.info(`Item added to cart`, {
+      userId,
+      productId: product_id,
+      quantity,
+      productName: product.name
+    });
+
+    res.json({ message: "Item added to cart", itemCount });
+  } catch (error) {
+    logger.error("Error adding item to cart", {
+      userId: req.session.user.id,
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ message: "Error adding item to cart" });
   }
-);
+});
 
 // Update cart item quantity
-router.post("/:productId/update", requireAuth, sanitizeInput, async (req, res) => {
-    try {
-      const { quantity } = req.body;
-      const userId = req.session.user.id;
-      const productId = req.params.productId;
+router.post("/:productId/update", sanitizeInput, async (req, res) => {
+  try {
+    const { quantity } = req.body;
+    const userId = req.session.user.id;
+    const productId = req.params.productId;
 
-      // Validate quantity
-      const qty = parseInt(quantity);
-      if (isNaN(qty) || qty < 0) {
-        return res.status(400).json({ message: "Invalid quantity" });
-      }
+    // Validate quantity
+    const qty = parseInt(quantity);
+    if (isNaN(qty) || qty < 0) {
+      return res.status(400).json({ message: "Invalid quantity" });
+    }
 
-      // Get current cart item to calculate stock adjustment
-      const currentCartItem = await Cart.findOne({
-        where: { user_id: userId, product_id: productId }
-      });
-      const currentQty = currentCartItem ? currentCartItem.quantity : 0;
-
-      // Check stock if increasing quantity
-      if (qty > 0) {
-        const product = await Product.findByPk(productId);
-        if (!product) {
-          return res.status(404).json({ message: "Product not found" });
-        }
-
-        const quantityDifference = qty - currentQty;
-        if (product.stock_quantity < quantityDifference) {
-          return res.status(400).json({ message: "Insufficient stock" });
-        }
-
-        // Adjust stock quantity
-        product.stock_quantity -= quantityDifference;
-        await product.save();
-      } else if (qty === 0) {
-        // If removing item, restore stock
-        const product = await Product.findByPk(productId);
-        if (product) {
-          product.stock_quantity += currentQty;
-          await product.save();
-        }
-      }
-
-      await Cart.updateQuantity(userId, productId, qty);
+    // If quantity is 0, remove item
+    if (qty === 0) {
+      await Cart.removeItem(userId, productId);
       const itemCount = await Cart.getCartItemCount(userId);
 
-      res.json({ message: "Cart updated", itemCount });
-    } catch (error) {
-      console.error("Error updating cart:", error);
-      res.status(500).json({ message: "Error updating cart" });
+      logger.info(`Item removed from cart`, { userId, productId });
+      return res.json({ message: "Item removed from cart", itemCount });
     }
+
+    // Check stock availability
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (product.stock_quantity < qty) {
+      logger.warn(`Update cart failed - insufficient stock`, {
+        userId,
+        productId,
+        requested: qty,
+        available: product.stock_quantity
+      });
+      return res.status(400).json({
+        message: `Only ${product.stock_quantity} item(s) available in stock`
+      });
+    }
+
+    // Update quantity
+    await Cart.updateQuantity(userId, productId, qty);
+    const itemCount = await Cart.getCartItemCount(userId);
+
+    logger.info(`Cart quantity updated`, { userId, productId, newQuantity: qty });
+
+    res.json({ message: "Cart updated", itemCount });
+  } catch (error) {
+    logger.error("Error updating cart", {
+      userId: req.session.user.id,
+      error: error.message
+    });
+    res.status(500).json({ message: "Error updating cart" });
   }
-);
+});
 
 // Remove item from cart
-router.post("/:productId/remove", requireAuth, async (req, res) => {
+router.post("/:productId/remove", async (req, res) => {
   try {
     const userId = req.session.user.id;
     const productId = req.params.productId;
 
-    // Get current cart item quantity before removing to restore stock
-    const currentCartItem = await Cart.findOne({
-      where: { user_id: userId, product_id: productId }
-    });
-
-    if (currentCartItem) {
-      // Restore stock quantity
-      const product = await Product.findByPk(productId);
-      if (product) {
-        product.stock_quantity += currentCartItem.quantity;
-        await product.save();
-      }
-    }
-
     await Cart.removeItem(userId, productId);
     const itemCount = await Cart.getCartItemCount(userId);
 
+    logger.info(`Item removed from cart`, { userId, productId });
+
     res.json({ message: "Item removed from cart", itemCount });
   } catch (error) {
-    console.error("Error removing item from cart:", error);
+    logger.error("Error removing item from cart", {
+      userId: req.session.user.id,
+      error: error.message
+    });
     res.status(500).json({ message: "Error removing item from cart" });
   }
 });
 
 // Clear cart
-router.post("/clear", requireAuth, async (req, res) => {
+router.post("/clear", async (req, res) => {
   try {
     const userId = req.session.user.id;
 
-    // Get all cart items before clearing to restore stock
-    const cartItems = await Cart.getCart(userId);
-
-    // Restore stock for all items
-    for (const item of cartItems) {
-      const product = await Product.findByPk(item.product_id);
-      if (product) {
-        product.stock_quantity += item.quantity;
-        await product.save();
-      }
-    }
-
     await Cart.clearCart(userId);
+
+    logger.info(`Cart cleared`, { userId });
 
     res.json({ message: "Cart cleared" });
   } catch (error) {
-    console.error("Error clearing cart:", error);
+    logger.error("Error clearing cart", {
+      userId: req.session.user.id,
+      error: error.message
+    });
     res.status(500).json({ message: "Error clearing cart" });
   }
 });
 
 // Get cart summary (for AJAX updates)
-router.get("/summary", requireAuth, async (req, res) => {
+router.get("/summary", async (req, res) => {
   try {
     const total = await Cart.getCartTotal(req.session.user.id);
     const itemCount = await Cart.getCartItemCount(req.session.user.id);
 
     res.json({ total, itemCount });
   } catch (error) {
-    console.error("Error getting cart summary:", error);
+    logger.error("Error getting cart summary", {
+      userId: req.session.user.id,
+      error: error.message
+    });
     res.status(500).json({ message: "Error getting cart summary" });
   }
 });

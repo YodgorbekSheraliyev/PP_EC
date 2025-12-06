@@ -25,8 +25,10 @@ const validateRegistration = [
     .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
-    .notEmpty()
-    .withMessage('Password is required'),
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'),
   handleValidationErrors
 ];
 
@@ -87,12 +89,12 @@ const validateOrder = [
     .withMessage('Invalid payment method')
 ];
 
-// Sanitization middleware
+// Improved sanitization middleware - only trim, let Handlebars handle HTML escaping
 const sanitizeInput = (req, res, next) => {
-  // Sanitize string inputs
+  // Sanitize string inputs - only trim whitespace
   for (const key in req.body) {
     if (typeof req.body[key] === 'string') {
-      req.body[key] = req.body[key].trim().replace(/[<>]/g, '');
+      req.body[key] = req.body[key].trim();
     }
   }
   next();
