@@ -113,6 +113,7 @@ require("./utils/hbs-helpers");
 
 // CSRF Protection for state-changing routes
 app.use(['/auth/register', '/auth/login', '/auth/profile'], csrfProtection, injectCsrfToken);
+app.use('/products', csrfProtection, injectCsrfToken);
 app.use('/cart', csrfProtection, injectCsrfToken);
 app.use('/orders', csrfProtection, injectCsrfToken);
 app.use('/admin', csrfProtection, injectCsrfToken);

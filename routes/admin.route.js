@@ -197,7 +197,7 @@ router.get("/logs", (req, res) => {
         logger.error('Error reading log file: %o', err);
         return res.render('error', { message: 'Error loading logs' });
       }
-      const logLines = data.trim().split('\\n').slice(-50).map(line => {
+      const logLines = data.trim().split('\n').slice(-50).map(line => {
         try {
           const logEntry = JSON.parse(line);
 

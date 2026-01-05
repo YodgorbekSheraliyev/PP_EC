@@ -5,21 +5,29 @@ const Cart = require('./Cart');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 
-// Initialize models
+// Initialize all models first
+User.init(sequelize);
+Product.init(sequelize);
+Cart.init(sequelize);
+Order.init(sequelize);
+OrderItem.init(sequelize);
+
+// Create models object
 const models = {
-  User: User.init ? User.init(sequelize) : User,
-  Product: Product.init ? Product.init(sequelize) : Product,
-  Cart: Cart.init ? Cart.init(sequelize) : Cart,
-  Order: Order.init ? Order.init(sequelize) : Order,
-  OrderItem: OrderItem.init ? OrderItem.init(sequelize) : OrderItem
+  User,
+  Product,
+  Cart,
+  Order,
+  OrderItem,
+  sequelize
 };
 
-// Define associations
-Object.keys(models).forEach(modelName => {
-  if (models[modelName].associate) {
-    models[modelName].associate(models);
-  }
-});
+// Define associations AFTER all models are initialized
+if (User.associate) User.associate(models);
+if (Product.associate) Product.associate(models);
+if (Cart.associate) Cart.associate(models);
+if (Order.associate) Order.associate(models);
+if (OrderItem.associate) OrderItem.associate(models);
 
 // Sync database (only in development)
 if (process.env.NODE_ENV === 'development') {
