@@ -82,36 +82,50 @@ class Order extends Model {
     return colors[this.status] || 'secondary';
   }
 
+  // Getter for view compatibility
+  get items() {
+    return this.orderItems || [];
+  }
+
   // Static methods
-  static async create(orderData) {
+  static async createOrder(orderData) {
     const { user_id, total_amount, shipping_address, payment_method } = orderData;
 
     const transaction = await this.sequelize.transaction();
 
     try {
       // Create order
-      const order = await this.create({
+      const order = await this.build({
         user_id,
         total_amount,
         shipping_address,
         payment_method,
         status: 'pending'
-      }, { transaction });
+      }).save({ transaction });
 
       // Get cart items
       const cartItems = await this.sequelize.models.Cart.findAll({
         where: { user_id },
         include: [{
           model: this.sequelize.models.Product,
-          as: 'product'
+          as: 'product',
+          attributes: ['id', 'name', 'price', 'stock_quantity']
         }],
         transaction
       });
 
+      console.log(`Found ${cartItems.length} cart items for user ${user_id}`);
+
       // Create order items and update stock
       for (const item of cartItems) {
+        console.log(`Processing item: product_id=${item.product_id}, quantity=${item.quantity}, stock=${item.product?.stock_quantity}`);
+        
+        if (!item.product) {
+          throw new Error(`Product not found for cart item ${item.product_id}`);
+        }
+
         if (item.product.stock_quantity < item.quantity) {
-          throw new Error(`Insufficient stock for product ${item.product_id}`);
+          throw new Error(`Insufficient stock for product ${item.product_id}. Available: ${item.product.stock_quantity}, Requested: ${item.quantity}`);
         }
 
         // Create order item
@@ -123,9 +137,13 @@ class Order extends Model {
         }, { transaction });
 
         // Update product stock
-        await item.product.update({
-          stock_quantity: item.product.stock_quantity - item.quantity
-        }, { transaction });
+        const newStock = item.product.stock_quantity - item.quantity;
+        console.log(`Updating product ${item.product_id} stock from ${item.product.stock_quantity} to ${newStock}`);
+        
+        await this.sequelize.models.Product.update(
+          { stock_quantity: newStock },
+          { where: { id: item.product_id }, transaction }
+        );
       }
 
       // Clear cart
@@ -184,13 +202,19 @@ class Order extends Model {
   }
 
   static async updateStatus(id, status) {
+    console.log(`\n📍 Order.updateStatus called with id=${id}, status=${status}`);
     const order = await this.findByPk(id);
-    if (order) {
-      order.status = status;
-      await order.save();
-      return order;
+    
+    if (!order) {
+      console.log(`❌ Order ${id} not found`);
+      return null;
     }
-    return null;
+    
+    console.log(`Current status: ${order.status}, New status: ${status}`);
+    order.status = status;
+    await order.save();
+    console.log(`✅ Order ${id} status updated to ${status}`);
+    return order;
   }
 
   static async getAllOrders(limit = 20, offset = 0) {

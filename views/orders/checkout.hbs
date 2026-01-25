@@ -23,17 +23,17 @@
         </div>
         {{/if}}
 
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Shipping Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="checkout-form" action="/orders/checkout" method="POST">
-                            {{!-- CSRF Token - IMPORTANT --}}
-                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+        <form id="checkout-form" action="/orders/checkout" method="POST">
+            {{!-- CSRF Token - IMPORTANT --}}
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
 
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5>Shipping Information</h5>
+                        </div>
+                        <div class="card-body">
                             <div class="mb-3">
                                 <label for="shipping_address" class="form-label">Shipping Address</label>
                                 <textarea class="form-control" id="shipping_address" name="shipping_address" rows="4" required minlength="10" maxlength="500" placeholder="Enter your full shipping address including street, city, postal code, and country"></textarea>
@@ -49,36 +49,49 @@
                                     <option value="bank_transfer">Bank Transfer</option>
                                 </select>
                             </div>
-                        </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Order Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            {{#each cartItems}}
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>{{product.name}} (x{{quantity}})</span>
+                                <span>${{formatPrice (multiply quantity product.price)}}</span>
+                            </div>
+                            {{/each}}
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <strong>Total:</strong>
+                                <strong>${{formatPrice total}}</strong>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 mt-3">Place Order</button>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Order Summary</h5>
-                    </div>
-                    <div class="card-body">
-                        {{#each cartItems}}
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>{{product.name}} (x{{quantity}})</span>
-                            <span>${{formatPrice (multiply quantity product.price)}}</span>
-                        </div>
-                        {{/each}}
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <strong>Total:</strong>
-                            <strong>${{formatPrice total}}</strong>
-                        </div>
-                        <button type="submit" form="checkout-form" class="btn btn-success w-100 mt-3">Place Order</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </form>
     </div>
 
     {{> footer}}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('checkout-form').addEventListener('submit', function(e) {
+            // Validate form before submission
+            if (!this.checkValidity()) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.add('was-validated');
+                return false;
+            }
+            // Allow form to submit normally
+            this.classList.add('was-validated');
+        });
+    </script>
 </body>
 </html>

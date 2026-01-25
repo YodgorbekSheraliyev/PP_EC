@@ -100,6 +100,12 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Request timeout middleware - prevent hanging requests
+app.use((req, res, next) => {
+  req.setTimeout(30000); // 30 seconds
+  next();
+});
+
 // View engine setup
 app.set("view engine", "hbs");
 app.set("views", path.join(__dirname, "views"));
@@ -127,23 +133,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware to set cart item count for authenticated users
-app.use(async (req, res, next) => {
-  if (req.session.user) {
-    const Cart = require('./models/Cart');
-    try {
-      const itemCount = await Cart.getCartItemCount(req.session.user.id);
-      res.locals.itemCount = itemCount;
-    } catch (error) {
-      logger.error('Error fetching cart count:', {
-        userId: req.session.user.id,
-        error: error.message
-      });
-      res.locals.itemCount = 0;
-    }
-  } else {
-    res.locals.itemCount = 0;
-  }
+// Middleware to set cart item count for authenticated users (only on key routes)
+// TODO: Optimize this - currently disabled to prevent performance issues
+// app.use((req, res, next) => {
+//   if (req.session.user && ['/','/', '/products', '/cart', '/orders', '/admin'].some(p => req.path.startsWith(p))) {
+//     const Cart = require('./models/Cart');
+//     Cart.getCartItemCount(req.session.user.id)
+//       .then(itemCount => {
+//         res.locals.itemCount = itemCount;
+//         next();
+//       })
+//       .catch(error => {
+//         logger.error('Error fetching cart count:', {
+//           userId: req.session.user.id,
+//           error: error.message
+//         });
+//         res.locals.itemCount = 0;
+//         next();
+//       });
+//   } else {
+//     res.locals.itemCount = 0;
+//     next();
+//   }
+// });
+
+app.use((req, res, next) => {
+  res.locals.itemCount = 0;
   next();
 });
 

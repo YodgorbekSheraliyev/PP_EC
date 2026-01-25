@@ -105,7 +105,7 @@ router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, 
       payment_method
     };
 
-    const order = await Order.create(orderData);
+    const order = await Order.createOrder(orderData);
 
     // Clear the cart after successful order
     await Cart.clearCart(userId);
@@ -139,7 +139,8 @@ router.get('/admin/all', requireAdmin, async (req, res) => {
     res.render('admin/orders/index', {
       orders,
       currentPage: page,
-      user: req.session.user
+      user: req.session.user,
+      csrfToken: req.csrfToken?.()
     });
   } catch (error) {
     console.error('Error fetching all orders:', error);
@@ -149,17 +150,32 @@ router.get('/admin/all', requireAdmin, async (req, res) => {
 
 router.post('/:id/status', requireAdmin, sanitizeInput, async (req, res) => {
   try {
+    console.log('\n📍 Status update request received');
+    console.log('Order ID:', req.params.id);
+    console.log('Request body:', req.body);
+    console.log('CSRF token from header:', !!req.headers['x-csrf-token']);
+    console.log('CSRF token valid:', !!req.csrfToken);
+    
     const { status } = req.body;
     const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
     if (!validStatuses.includes(status)) {
+      console.log('❌ Invalid status:', status);
       return res.status(400).json({ message: 'Invalid status' });
     }
 
+    console.log('Calling Order.updateStatus with:', req.params.id, status);
     const order = await Order.updateStatus(req.params.id, status);
+    
+    if (!order) {
+      console.log('❌ Order not found:', req.params.id);
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    
+    console.log('✅ Order status updated successfully:', order.id, 'to', status);
     res.json({ message: 'Order status updated', order });
   } catch (error) {
-    console.error('Error updating order status:', error);
+    console.error('❌ Error updating order status:', error);
     res.status(500).json({ message: 'Error updating order status' });
   }
 });

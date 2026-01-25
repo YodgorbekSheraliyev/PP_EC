@@ -31,10 +31,10 @@
                     {{#each orders}}
                     <tr>
                         <td>{{id}}</td>
-                        <td>{{user_email}}</td>
+                        <td>{{user.email}}</td>
                         <td>${{total_amount}}</td>
                         <td>
-                            <select class="form-select form-select-sm status-select" data-order-id="{{id}}" onchange="updateStatus({{id}}, this.value)">
+                            <select class="form-select form-select-sm status-select" data-order-id="{{id}}">
                                 <option value="pending" {{#eq status "pending"}}selected{{/eq}}>Pending</option>
                                 <option value="processing" {{#eq status "processing"}}selected{{/eq}}>Processing</option>
                                 <option value="shipped" {{#eq status "shipped"}}selected{{/eq}}>Shipped</option>
@@ -62,26 +62,94 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Initialize event listeners for status dropdowns
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ Page loaded, attaching event listeners');
+            const statusSelects = document.querySelectorAll('.status-select');
+            console.log(`Found ${statusSelects.length} status dropdowns`);
+            
+            statusSelects.forEach(select => {
+                select.addEventListener('change', function(e) {
+                    const orderId = this.dataset.orderId;
+                    const newStatus = this.value;
+                    console.log('🎯 Dropdown changed:', { orderId, newStatus });
+                    updateStatus(orderId, newStatus);
+                });
+            });
+        });
+
         async function updateStatus(orderId, newStatus) {
+            console.log('🔄 updateStatus called:', { orderId, newStatus });
+            
             try {
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta?.content;
+                
+                console.log('📍 Meta tag found:', !!csrfMeta);
+                console.log('📍 CSRF content:', csrfToken ? csrfToken.substring(0, 15) + '...' : 'UNDEFINED');
+                
+                if (!csrfToken) {
+                    console.error('❌ CSRF token not found in meta tag!');
+                    showAlert('Security token missing. Please refresh the page.', 'danger');
+                    return;
+                }
+                
+                const payload = {
+                    status: newStatus,
+                    _csrf: csrfToken
+                };
+                
+                console.log('📤 Sending POST request with:', {
+                    url: `/orders/${orderId}/status`,
+                    statusInBody: newStatus,
+                    tokenLength: csrfToken.length
+                });
+                
                 const response = await fetch(`/orders/${orderId}/status`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        'x-csrf-token': csrfToken
                     },
-                    body: JSON.stringify({ status: newStatus })
+                    body: JSON.stringify(payload)
                 });
 
+                console.log('📥 Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: {
+                        contentType: response.headers.get('content-type')
+                    }
+                });
+                
                 if (response.ok) {
-                    // Show success message
-                    showAlert('Order status updated successfully', 'success');
+                    const data = await response.json();
+                    console.log('✅ Success! Response data:', data);
+                    
+                    // Update the dropdown to show the new status value
+                    const select = document.querySelector(`select[data-order-id="${orderId}"]`);
+                    if (select) {
+                        select.value = newStatus;
+                        console.log('✅ Dropdown updated to show:', newStatus);
+                    }
+                    
+                    showAlert('✅ Status updated to: ' + newStatus.toUpperCase(), 'success');
                 } else {
-                    showAlert('Error updating order status', 'danger');
+                    let errorMsg = 'Error updating order status';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || errorMsg;
+                        console.error('❌ Error response data:', errorData);
+                    } catch (e) {
+                        const text = await response.text();
+                        console.error('❌ Error response (text):', text.substring(0, 200));
+                    }
+                    console.error(`❌ Request failed with status ${response.status}: ${errorMsg}`);
+                    showAlert(errorMsg, 'danger');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showAlert('Error updating order status', 'danger');
+                console.error('❌ Exception caught:', error);
+                showAlert('Error updating order status: ' + error.message, 'danger');
             }
         }
 
