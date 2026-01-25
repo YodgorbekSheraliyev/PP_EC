@@ -107,9 +107,7 @@ router.post('/checkout', requireAuth, sanitizeInput, validateOrder, async (req, 
 
     const order = await Order.createOrder(orderData);
 
-    // Clear the cart after successful order
-    await Cart.clearCart(userId);
-
+    // Cart is already cleared in createOrder
     res.redirect(`/orders/${order.id}`);
   } catch (error) {
     console.error('Error creating order:', error);
@@ -177,6 +175,60 @@ router.post('/:id/status', requireAdmin, sanitizeInput, async (req, res) => {
   } catch (error) {
     console.error('❌ Error updating order status:', error);
     res.status(500).json({ message: 'Error updating order status' });
+  }
+});
+
+// Cancel order (restore stock)
+router.post('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const userId = req.session.user.id;
+
+    // Get order and verify ownership
+    const order = await Order.findByPk(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.user_id !== userId) {
+      return res.status(403).json({ message: 'Not authorized to cancel this order' });
+    }
+
+    // Only allow cancelling pending orders
+    if (order.status !== 'pending') {
+      return res.status(400).json({ message: `Cannot cancel ${order.status} orders` });
+    }
+
+    // Get order items to restore stock
+    const orderItems = await Order.sequelize.models.OrderItem.findAll({
+      where: { order_id: orderId },
+      include: [{
+        model: Order.sequelize.models.Product,
+        as: 'product',
+        attributes: ['id', 'name', 'stock_quantity']
+      }]
+    });
+
+    // Restore stock for each item
+    for (const item of orderItems) {
+      const restoredStock = item.product.stock_quantity + item.quantity;
+      await Order.sequelize.models.Product.update(
+        { stock_quantity: restoredStock },
+        { where: { id: item.product_id } }
+      );
+      console.log(`↩️  Stock restored (cancel order): Product ${item.product_id} (${item.product.name}) stock: ${item.product.stock_quantity} → ${restoredStock}`);
+    }
+
+    // Update order status to cancelled
+    order.status = 'cancelled';
+    await order.save();
+
+    console.log(`✅ Order ${orderId} cancelled and stock restored`);
+    res.json({ message: 'Order cancelled and stock restored', order });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    res.status(500).json({ message: 'Error cancelling order' });
   }
 });
 

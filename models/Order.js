@@ -116,19 +116,15 @@ class Order extends Model {
 
       console.log(`Found ${cartItems.length} cart items for user ${user_id}`);
 
-      // Create order items and update stock
+      // Create order items (stock already reserved in cart, no need to update)
       for (const item of cartItems) {
-        console.log(`Processing item: product_id=${item.product_id}, quantity=${item.quantity}, stock=${item.product?.stock_quantity}`);
+        console.log(`Processing item: product_id=${item.product_id}, quantity=${item.quantity}`);
 
         if (!item.product) {
           throw new Error(`Product not found for cart item ${item.product_id}`);
         }
 
-        if (item.product.stock_quantity < item.quantity) {
-          throw new Error(`Insufficient stock for product ${item.product_id}. Available: ${item.product.stock_quantity}, Requested: ${item.quantity}`);
-        }
-
-        // Create order item
+        // Create order item - stock is already reserved in cart
         await this.sequelize.models.OrderItem.create({
           order_id: order.id,
           product_id: item.product_id,
@@ -136,14 +132,7 @@ class Order extends Model {
           price: item.product.price
         }, { transaction });
 
-        // Update product stock
-        const newStock = item.product.stock_quantity - item.quantity;
-        console.log(`Updating product ${item.product_id} stock from ${item.product.stock_quantity} to ${newStock}`);
-
-        await this.sequelize.models.Product.update(
-          { stock_quantity: newStock },
-          { where: { id: item.product_id }, transaction }
-        );
+        console.log(`✅ Order item created for product ${item.product_id}`);
       }
 
       // Clear cart

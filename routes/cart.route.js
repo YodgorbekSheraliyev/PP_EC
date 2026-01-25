@@ -61,6 +61,14 @@ router.post("/add", sanitizeInput, validateCartItem, async (req, res) => {
     // Add to cart (this will combine with existing items if any)
     await Cart.addItem(userId, product_id, quantity);
 
+    // Decrease stock immediately when added to cart
+    const newStock = product.stock_quantity - quantity;
+    await Product.update(
+      { stock_quantity: newStock },
+      { where: { id: product_id } }
+    );
+    console.log(`📦 Stock reserved: Product ${product_id} (${product.name}) stock: ${product.stock_quantity} → ${newStock} (reserved ${quantity} units)`);
+
     const itemCount = await Cart.getCartItemCount(userId);
 
     logger.info(`Item added to cart`, {
@@ -94,8 +102,26 @@ router.post("/:productId/update", sanitizeInput, async (req, res) => {
       return res.status(400).json({ message: "Invalid quantity" });
     }
 
+    // Get current cart item
+    const currentItem = await Cart.findOne({
+      where: { user_id: userId, product_id: productId }
+    });
+
+    if (!currentItem) {
+      return res.status(404).json({ message: "Item not in cart" });
+    }
+
     // If quantity is 0, remove item
     if (qty === 0) {
+      // Restore stock when removing
+      const product = await Product.findByPk(productId);
+      const restoredStock = product.stock_quantity + currentItem.quantity;
+      await Product.update(
+        { stock_quantity: restoredStock },
+        { where: { id: productId } }
+      );
+      console.log(`↩️  Stock restored (qty update to 0): Product ${productId} stock: ${product.stock_quantity} → ${restoredStock}`);
+
       await Cart.removeItem(userId, productId);
       const itemCount = await Cart.getCartItemCount(userId);
 
@@ -109,16 +135,36 @@ router.post("/:productId/update", sanitizeInput, async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    if (product.stock_quantity < qty) {
+    // Calculate the difference in quantity
+    const quantityDiff = qty - currentItem.quantity;
+    const newAvailableStock = product.stock_quantity - quantityDiff;
+
+    // Check if we have enough stock for the difference
+    if (quantityDiff > 0 && newAvailableStock < 0) {
       logger.warn(`Update cart failed - insufficient stock`, {
         userId,
         productId,
-        requested: qty,
+        currentQty: currentItem.quantity,
+        requestedQty: qty,
+        additionalNeeded: quantityDiff,
         available: product.stock_quantity
       });
       return res.status(400).json({
-        message: `Only ${product.stock_quantity} item(s) available in stock`
+        message: `Only ${product.stock_quantity} additional item(s) available in stock`
       });
+    }
+
+    // Update stock based on quantity difference
+    if (quantityDiff !== 0) {
+      await Product.update(
+        { stock_quantity: newAvailableStock },
+        { where: { id: productId } }
+      );
+      if (quantityDiff > 0) {
+        console.log(`📦 Stock reserved (qty update): Product ${productId} stock: ${product.stock_quantity} → ${newAvailableStock} (reserved ${quantityDiff} more units)`);
+      } else {
+        console.log(`↩️  Stock released (qty update): Product ${productId} stock: ${product.stock_quantity} → ${newAvailableStock} (released ${-quantityDiff} units)`);
+      }
     }
 
     // Update quantity
@@ -143,6 +189,22 @@ router.post("/:productId/remove", async (req, res) => {
     const userId = req.session.user.id;
     const productId = req.params.productId;
 
+    // Get cart item to restore stock
+    const cartItem = await Cart.findOne({
+      where: { user_id: userId, product_id: productId }
+    });
+
+    if (cartItem) {
+      // Restore stock when removing from cart
+      const product = await Product.findByPk(productId);
+      const restoredStock = product.stock_quantity + cartItem.quantity;
+      await Product.update(
+        { stock_quantity: restoredStock },
+        { where: { id: productId } }
+      );
+      console.log(`↩️  Stock restored: Product ${productId} stock: ${product.stock_quantity} → ${restoredStock} (released ${cartItem.quantity} units)`);
+    }
+
     await Cart.removeItem(userId, productId);
     const itemCount = await Cart.getCartItemCount(userId);
 
@@ -162,6 +224,21 @@ router.post("/:productId/remove", async (req, res) => {
 router.post("/clear", async (req, res) => {
   try {
     const userId = req.session.user.id;
+
+    // Get all cart items to restore stock
+    const cartItems = await Cart.findAll({
+      where: { user_id: userId }
+    });
+
+    for (const item of cartItems) {
+      const product = await Product.findByPk(item.product_id);
+      const restoredStock = product.stock_quantity + item.quantity;
+      await Product.update(
+        { stock_quantity: restoredStock },
+        { where: { id: item.product_id } }
+      );
+      console.log(`↩️  Stock restored (clear): Product ${item.product_id} stock: ${product.stock_quantity} → ${restoredStock}`);
+    }
 
     await Cart.clearCart(userId);
 
