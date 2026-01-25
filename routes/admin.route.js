@@ -1,11 +1,8 @@
 const logger = require('../utils/logger');
-const User = require("../models/User");
-const Product = require("../models/Product");
-const Order = require("../models/Order");
+const { User, Product, Order, OrderItem } = require("../models");
 const { requireAdmin } = require("../middleware/auth");
 const { Op, fn, col, literal } = require("sequelize");
 const { Router } = require("express");
-const { OrderItem } = require("../models");
 
 const router = Router();
 

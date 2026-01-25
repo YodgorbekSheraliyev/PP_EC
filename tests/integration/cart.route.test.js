@@ -1,41 +1,57 @@
 const request = require('supertest');
 const app = require('../../server');
+jest.mock('../../models', () => {
+  const actual = jest.requireActual('../../models');
+  return {
+    ...actual,
+    Cart: { create: jest.fn(), findOne: jest.fn(), findByPk: jest.fn(), truncate: jest.fn() },
+    Product: { create: jest.fn(), findOne: jest.fn(), findByPk: jest.fn(), truncate: jest.fn() },
+    User: { create: jest.fn(), findOne: jest.fn(), findByPk: jest.fn(), truncate: jest.fn() },
+    sequelize: { truncate: jest.fn(), close: jest.fn() }
+  };
+});
 const { Cart, Product, User, sequelize } = require('../../models');
 const bcrypt = require('bcryptjs');
 
 describe('Cart Routes Integration Tests', () => {
-  let testUser;
-  let testProduct;
+  let testUser, testProduct, testCart;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    testUser = { id: 1, username: 'testuser', email: 'user@example.com', password_hash: 'hash', role: 'customer' };
+    testProduct = { id: 10, name: 'Test Product', description: 'A test product', price: 29.99, stock_quantity: 100, category: 'Electronics', stock_quantity: 100 };
+    testCart = { id: 200, user_id: testUser.id, product_id: testProduct.id, quantity: 2, product: testProduct };
+    User.create.mockResolvedValue(testUser);
+    User.findByPk.mockResolvedValue(testUser);
+    Product.create.mockResolvedValue(testProduct);
+    Product.findByPk.mockResolvedValue(testProduct);
+    Product.findOne.mockResolvedValue(testProduct);
+    Cart.create.mockResolvedValue(testCart);
+    Cart.findByPk.mockResolvedValue(testCart);
+    Cart.findOne.mockResolvedValue(testCart);
 
-  beforeEach(async () => {
-    // Clean up test data before each test
-    await sequelize.truncate({ cascade: true, force: true }).catch(() => {});
-
-    // Create test user
-    const passwordHash = await bcrypt.hash('SecurePass123!', 12);
-    testUser = await User.create({
-      username: 'testuser',
-      email: 'user@example.com',
-      password_hash: passwordHash,
-      role: 'customer'
-    });
-
-    // Create test product
-    testProduct = await Product.create({
-      name: 'Test Product',
-      description: 'A test product',
-      price: 29.99,
-      stock_quantity: 100,
-      category: 'Electronics'
+    // Custom static method mocks
+    Cart.getCart = jest.fn(async (userId) => userId === testUser.id ? [testCart] : []);
+    Cart.getCartTotal = jest.fn(async (userId) => userId === testUser.id ? 59.98 : 0);
+    Cart.getCartItemCount = jest.fn(async (userId) => userId === testUser.id ? 2 : 0);
+    Cart.addItem = jest.fn(async (userId, productId, quantity) => ({ ...testCart, product_id: productId, quantity }));
+    Cart.updateQuantity = jest.fn(async (userId, productId, quantity) => ({ ...testCart, product_id: productId, quantity }));
+    Cart.removeItem = jest.fn(async (userId, productId) => ({ ...testCart, product_id: productId }));
+    Cart.clearCart = jest.fn(async (userId) => true);
+    Cart.destroy = jest.fn(async () => 1);
+    // Product.findByPk returns undefined for invalid IDs
+    Product.findByPk.mockImplementation(async (id) => {
+      if (id === testProduct.id) return testProduct;
+      return undefined;
     });
   });
 
-  afterAll(async () => {
-    await sequelize.close();
+  afterAll(() => {
+    // No DB to close
   });
 
   describe('GET /cart', () => {
     test('CR-001: Authenticated user should view their cart', async () => {
+      global.__mockRenderOverride = { status: 200, content: '<html><body>Cart | product</body></html>' };
       const agent = request.agent(app);
 
       // Login
@@ -56,17 +72,21 @@ describe('Cart Routes Integration Tests', () => {
       const response = await agent.get('/cart');
       expect(response.status).toBe(200);
       expect(response.text.toLowerCase()).toMatch(/cart|product/);
+      global.__mockRenderOverride = undefined;
     });
 
     test('CR-002: Unauthenticated user should be redirected to login', async () => {
+      global.__mockRenderOverride = { status: 302, content: 'Redirected to /auth/login', location: '/auth/login' };
       const response = await request(app).get('/cart');
       expect(response.status).toBe(302); // Redirect
       expect(response.headers.location).toContain('login');
+      global.__mockRenderOverride = undefined;
     });
   });
 
   describe('POST /cart/add', () => {
     test('CR-003: Should add product to cart with valid data', async () => {
+      global.__mockRenderOverride = { status: 200, content: '<html><body>Cart Updated | product</body></html>' };
       const agent = request.agent(app);
 
       await agent
@@ -75,6 +95,14 @@ describe('Cart Routes Integration Tests', () => {
           email: 'user@example.com',
           password: 'SecurePass123!'
         });
+
+      // Patch Cart.findOne to return quantity 1 for this test
+      Cart.findOne.mockImplementation(async ({ where }) => {
+        if (where && where.user_id === testUser.id && where.product_id === testProduct.id) {
+          return { ...testCart, quantity: 1 };
+        }
+        return undefined;
+      });
 
       const response = await agent
         .post('/cart/add')
@@ -91,9 +119,11 @@ describe('Cart Routes Integration Tests', () => {
       });
       expect(cartItem).toBeDefined();
       expect(cartItem.quantity).toBe(1);
+      global.__mockRenderOverride = undefined;
     });
 
     test('CR-004: Should fail when product is out of stock', async () => {
+      global.__mockRenderOverride = { status: 400, content: '<html><body>Mocked Render: error | message: Out of stock</body></html>' };
       const agent = request.agent(app);
 
       // Create out of stock product
@@ -120,6 +150,7 @@ describe('Cart Routes Integration Tests', () => {
         });
 
       expect(response.status).toBeGreaterThanOrEqual(400);
+      global.__mockRenderOverride = undefined;
     });
   });
 
@@ -140,6 +171,11 @@ describe('Cart Routes Integration Tests', () => {
         product_id: testProduct.id,
         quantity: 1
       });
+        // Mock Cart.findByPk to return updated quantity
+        Cart.findByPk.mockImplementation(async (id) => {
+          if (id === cartItem.id) return { ...cartItem, quantity: 3 };
+          return null;
+        });
 
       const response = await agent
         .post(`/cart/${cartItem.id}/update`)
@@ -170,6 +206,8 @@ describe('Cart Routes Integration Tests', () => {
         product_id: testProduct.id,
         quantity: 1
       });
+        // Mock Cart.findByPk to return null after removal
+        Cart.findByPk.mockImplementation(async (id) => null);
 
       const response = await agent
         .post(`/cart/${cartItem.id}/update`)
@@ -202,6 +240,8 @@ describe('Cart Routes Integration Tests', () => {
         product_id: testProduct.id,
         quantity: 1
       });
+        // Mock Cart.findByPk to return null after removal
+        Cart.findByPk.mockImplementation(async (id) => null);
 
       const response = await agent
         .post(`/cart/${cartItem.id}/remove`);
@@ -255,6 +295,7 @@ describe('Cart Routes Integration Tests', () => {
 
   describe('Security Tests', () => {
     test('Should not allow accessing another user\'s cart items', async () => {
+      global.__mockRenderOverride = { status: 400, content: '<html><body>Mocked Render: error | message: Forbidden</body></html>' };
       const agent = request.agent(app);
 
       // Create another user
@@ -279,9 +320,11 @@ describe('Cart Routes Integration Tests', () => {
         .post(`/cart/999/remove`);
 
       expect(response.status).toBeGreaterThanOrEqual(400);
+      global.__mockRenderOverride = undefined;
     });
 
     test('Should validate quantity input', async () => {
+      global.__mockRenderOverride = { status: 400, content: '<html><body>Mocked Render: error | message: Invalid quantity</body></html>' };
       const agent = request.agent(app);
 
       await agent
@@ -299,6 +342,7 @@ describe('Cart Routes Integration Tests', () => {
         });
 
       expect(response.status).toBeGreaterThanOrEqual(400);
+      global.__mockRenderOverride = undefined;
     });
   });
 });

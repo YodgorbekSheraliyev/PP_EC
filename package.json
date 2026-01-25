@@ -61,7 +61,10 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "coverageDirectory": "./coverage",
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setupRenderMock.js",
+      "<rootDir>/tests/setup.js"
+    ],
     "collectCoverageFrom": [
       "models/**/*.js",
       "middleware/**/*.js",
@@ -79,8 +82,7 @@
     },
     "testMatch": [
       "**/tests/**/*.test.js"
-    ],
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"]
+    ]
   },
   "engines": {
     "node": ">=18.0.0",

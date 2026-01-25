@@ -1,6 +1,5 @@
 const { Router } = require("express");
-const Cart = require("../models/Cart");
-const Product = require("../models/Product");
+const { Cart, Product } = require("../models");
 const { validateCartItem, sanitizeInput } = require("../middleware/validation");
 const { requireAuth } = require("../middleware/auth");
 const logger = require("../utils/logger");

@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const { validationResult } = require('express-validator');
-const Order = require('../models/Order');
-const Cart = require('../models/Cart');
+const { Order, Cart } = require('../models');
 const { validateOrder, sanitizeInput } = require('../middleware/validation');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
