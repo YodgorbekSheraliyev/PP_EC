@@ -11,12 +11,12 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 async function check() {
   try {
     await sequelize.authenticate();
-    
+
     const result = await sequelize.query(
       "SELECT id, username, email, role FROM users",
       { type: Sequelize.QueryTypes.SELECT }
     );
-    
+
     console.log('Users and their roles:');
     result.forEach(user => {
       console.log(`  ${user.username} (${user.email}): ${user.role}`);

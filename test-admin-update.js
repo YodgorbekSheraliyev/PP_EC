@@ -72,7 +72,7 @@ async function runTests() {
     // Step 1: Get admin orders page to extract CSRF token
     console.log('1️⃣  Fetching admin orders page...');
     const adminResponse = await makeRequest('GET', '/orders/admin/all');
-    
+
     if (adminResponse.statusCode !== 200) {
       console.error('❌ Failed to fetch admin orders page. Status:', adminResponse.statusCode);
       console.error('Make sure you\'re logged in as an admin');
@@ -89,7 +89,7 @@ async function runTests() {
 
     // Step 2: Update order status
     console.log('\n2️⃣  Updating order 1 status from "pending" to "processing"...');
-    
+
     const updateBody = {
       status: 'processing',
       _csrf: csrfToken
@@ -109,7 +109,7 @@ async function runTests() {
 
     if (updateResponse.statusCode === 200) {
       console.log('✅ Order status updated successfully!');
-      
+
       // Parse response to verify
       const responseData = JSON.parse(updateResponse.body);
       console.log('Order status is now:', responseData.order?.status);

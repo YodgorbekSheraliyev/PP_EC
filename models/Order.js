@@ -119,7 +119,7 @@ class Order extends Model {
       // Create order items and update stock
       for (const item of cartItems) {
         console.log(`Processing item: product_id=${item.product_id}, quantity=${item.quantity}, stock=${item.product?.stock_quantity}`);
-        
+
         if (!item.product) {
           throw new Error(`Product not found for cart item ${item.product_id}`);
         }
@@ -139,7 +139,7 @@ class Order extends Model {
         // Update product stock
         const newStock = item.product.stock_quantity - item.quantity;
         console.log(`Updating product ${item.product_id} stock from ${item.product.stock_quantity} to ${newStock}`);
-        
+
         await this.sequelize.models.Product.update(
           { stock_quantity: newStock },
           { where: { id: item.product_id }, transaction }
@@ -204,12 +204,12 @@ class Order extends Model {
   static async updateStatus(id, status) {
     console.log(`\n📍 Order.updateStatus called with id=${id}, status=${status}`);
     const order = await this.findByPk(id);
-    
+
     if (!order) {
       console.log(`❌ Order ${id} not found`);
       return null;
     }
-    
+
     console.log(`Current status: ${order.status}, New status: ${status}`);
     order.status = status;
     await order.save();

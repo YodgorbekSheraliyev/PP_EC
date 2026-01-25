@@ -155,7 +155,7 @@ router.post('/:id/status', requireAdmin, sanitizeInput, async (req, res) => {
     console.log('Request body:', req.body);
     console.log('CSRF token from header:', !!req.headers['x-csrf-token']);
     console.log('CSRF token valid:', !!req.csrfToken);
-    
+
     const { status } = req.body;
     const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
@@ -166,12 +166,12 @@ router.post('/:id/status', requireAdmin, sanitizeInput, async (req, res) => {
 
     console.log('Calling Order.updateStatus with:', req.params.id, status);
     const order = await Order.updateStatus(req.params.id, status);
-    
+
     if (!order) {
       console.log('❌ Order not found:', req.params.id);
       return res.status(404).json({ message: 'Order not found' });
     }
-    
+
     console.log('✅ Order status updated successfully:', order.id, 'to', status);
     res.json({ message: 'Order status updated', order });
   } catch (error) {
