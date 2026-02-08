@@ -29,6 +29,7 @@
                         {{/if}}
 
                         <form action="/auth/register" method="POST">
+                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
                             <div class="mb-3">
                                 <label for="username" class="form-label">Username</label>
                                 <input type="text" class="form-control" id="username" name="username" required minlength="3" maxlength="50">

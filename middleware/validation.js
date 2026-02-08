@@ -1,6 +1,6 @@
 const { body, validationResult } = require('express-validator');
 
-// Middleware to handle validation errors
+// Middleware to handle validation errors (JSON response)
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -12,8 +12,17 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Middleware to check validation errors for forms (HTML response)
+const handleFormValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    req.validationErrors = errors.array();
+  }
+  next();
+};
+
 // Validation rules for user registration
-const validateRegistration = [
+const validateRegistrationRules = [
   body('username')
     .trim()
     .isLength({ min: 3, max: 50 })
@@ -27,21 +36,43 @@ const validateRegistration = [
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'),
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+];
+
+// Validation rules for user registration (with JSON error handling)
+const validateRegistration = [
+  ...validateRegistrationRules,
   handleValidationErrors
 ];
 
+// Validation rules for user registration (with form error handling)
+const validateRegistrationForm = [
+  ...validateRegistrationRules,
+  handleFormValidationErrors
+];
+
 // Validation rules for login
-const validateLogin = [
+const validateLoginRules = [
   body('email')
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
     .notEmpty()
-    .withMessage('Password is required'),
+    .withMessage('Password is required')
+];
+
+// Validation rules for login (with JSON error handling)
+const validateLogin = [
+  ...validateLoginRules,
   handleValidationErrors
+];
+
+// Validation rules for login (with form error handling)
+const validateLoginForm = [
+  ...validateLoginRules,
+  handleFormValidationErrors
 ];
 
 // Validation rules for product creation/update
@@ -89,6 +120,14 @@ const validateOrder = [
     .withMessage('Invalid payment method')
 ];
 
+// Validation rules for updating user role
+const validateRoleUpdate = [
+  body('role')
+    .isIn(['customer', 'admin'])
+    .withMessage('Role must be either "customer" or "admin"'),
+  handleValidationErrors
+];
+
 // Improved sanitization middleware - only trim, let Handlebars handle HTML escaping
 const sanitizeInput = (req, res, next) => {
   // Sanitize string inputs - only trim whitespace
@@ -102,9 +141,14 @@ const sanitizeInput = (req, res, next) => {
 
 module.exports = {
   validateRegistration,
+  validateRegistrationForm,
   validateLogin,
+  validateLoginForm,
   validateProduct,
   validateCartItem,
   validateOrder,
-  sanitizeInput
+  validateRoleUpdate,
+  sanitizeInput,
+  handleValidationErrors,
+  handleFormValidationErrors
 };

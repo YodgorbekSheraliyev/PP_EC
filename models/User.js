@@ -90,7 +90,8 @@ class User extends Model {
       });
       return user;
     } catch (error) {
-      throw new Error('Error creating user: ' + error.message);
+      console.error('User creation error details:', error.errors || error.message);
+      throw new Error('Error creating user: ' + (error.errors?.[0]?.message || error.message));
     }
   }
 

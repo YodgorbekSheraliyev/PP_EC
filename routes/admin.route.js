@@ -1,6 +1,8 @@
 const logger = require('../utils/logger');
 const { User, Product, Order, OrderItem } = require("../models");
 const { requireAdmin } = require("../middleware/auth");
+const { csrfProtection, injectCsrfToken } = require("../middleware/csrf");
+const { validateRoleUpdate, sanitizeInput } = require("../middleware/validation");
 const { Op, fn, col, literal } = require("sequelize");
 const { Router } = require("express");
 
@@ -8,6 +10,9 @@ const router = Router();
 
 // All admin routes require admin authentication
 router.use(requireAdmin);
+
+// Inject CSRF token into response locals for all admin pages
+router.use(injectCsrfToken);
 
 // Dashboard
 router.get("/", async (req, res) => {
@@ -48,41 +53,53 @@ router.get("/", async (req, res) => {
   }
 });
 
-// User management
+// User management GET route
 router.get("/users", async (req, res) => {
   try {
     const users = await User.findAll({
       group: "id",
       order: [["created_at", "ASC"]],
     });
-    res.render("admin/users/index", { users: users, user: req.session.user });
+    res.render("admin/users/index", {
+      users: users,
+      user: req.session.user,
+      csrfToken: req.csrfToken()
+    });
   } catch (error) {
     logger.error("Error fetching users: %o", error);
     res.render("error", { message: "Error loading users" });
   }
 });
 
-router.post("/users/:id/role", async (req, res) => {
-  try {
-    const { role } = req.body;
-    const userId = req.params.id;
+// User role update route with CSRF protection and validation
+router.post(
+  "/users/:id/role",
+  csrfProtection,
+  sanitizeInput,
+  validateRoleUpdate,
+  async (req, res) => {
+    try {
+      const { role } = req.body;
+      const userId = req.params.id;
 
-    if (!["customer", "admin"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
+      logger.info(`Admin attempting to update user ${userId} role to ${role}`);
+
+      const user = await User.findByPk(userId);
+      if (!user) {
+        logger.warn(`Admin attempted to update non-existent user ${userId}`);
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await user.update({ role });
+
+      logger.info(`Successfully updated user ${userId} role to ${role}`);
+      res.json({ message: "User role updated successfully" });
+    } catch (error) {
+      logger.error("Error updating user role: %o", error);
+      res.status(500).json({ message: "Error updating user role" });
     }
-
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    await user.update({ role });
-    res.json({ message: "User role updated successfully" });
-  } catch (error) {
-    logger.error("Error updating user role: %o", error);
-    res.status(500).json({ message: "Error updating user role" });
   }
-});
+);
 
 // Analytics
 router.get("/analytics", async (req, res) => {

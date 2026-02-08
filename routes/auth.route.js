@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 const { Router } = require('express');
 const logger = require('../utils/logger');
+const { validateRegistrationForm, validateLoginForm, sanitizeInput } = require('../middleware/validation');
 const {
   recordFailedAttempt,
   isLocked,
@@ -13,19 +14,25 @@ const router = Router();
 
 // Register route
 router.get('/register', (req, res) => {
-  res.render('auth/register', { errors: null, csrfToken: req.csrfToken?.() });
+  res.render('auth/register', { errors: null });
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', sanitizeInput, validateRegistrationForm, async (req, res) => {
   try {
+    // Check for validation errors
+    if (req.validationErrors) {
+      return res.render('auth/register', {
+        errors: req.validationErrors
+      });
+    }
+
     const { username, email, password } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
       return res.render('auth/register', {
-        errors: [{ msg: 'User already exists with this email' }],
-        csrfToken: req.csrfToken?.()
+        errors: [{ msg: 'User already exists with this email' }]
       });
     }
 
@@ -37,8 +44,7 @@ router.post('/register', async (req, res) => {
       if (err) {
         logger.error('Session regeneration error on registration: %o', err);
         return res.render('auth/register', {
-          errors: [{ msg: 'Registration failed. Please try again.' }],
-          csrfToken: req.csrfToken?.()
+          errors: [{ msg: 'Registration failed. Please try again.' }]
         });
       }
 
@@ -56,20 +62,27 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     logger.error('Registration error: %o', error);
+    const errorMsg = error.message || 'Registration failed. Please try again.';
     res.render('auth/register', {
-      errors: [{ msg: 'Registration failed. Please try again.' }],
-      csrfToken: req.csrfToken?.()
+      errors: [{ msg: errorMsg }]
     });
   }
 });
 
 // Login route
 router.get('/login', (req, res) => {
-  res.render('auth/login', { errors: null, csrfToken: req.csrfToken?.() });
+  res.render('auth/login', { errors: null });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', sanitizeInput, validateLoginForm, async (req, res) => {
   try {
+    // Check for validation errors
+    if (req.validationErrors) {
+      return res.render('auth/login', {
+        errors: req.validationErrors
+      });
+    }
+
     const { email, password } = req.body;
 
     // Check if account is locked
@@ -80,8 +93,7 @@ router.post('/login', async (req, res) => {
       return res.render('auth/login', {
         errors: [{
           msg: `Account temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).`
-        }],
-        csrfToken: req.csrfToken?.()
+        }]
       });
     }
 
@@ -91,8 +103,7 @@ router.post('/login', async (req, res) => {
       recordFailedAttempt(email);
       logger.warn(`Failed login attempt - invalid email: ${email}, IP: ${req.ip}`);
       return res.render('auth/login', {
-        errors: [{ msg: 'Invalid email or password' }],
-        csrfToken: req.csrfToken?.()
+        errors: [{ msg: 'Invalid email or password' }]
       });
     }
 
@@ -102,8 +113,7 @@ router.post('/login', async (req, res) => {
       recordFailedAttempt(email);
       logger.warn(`Failed login attempt - invalid password for: ${email}, IP: ${req.ip}`);
       return res.render('auth/login', {
-        errors: [{ msg: 'Invalid email or password' }],
-        csrfToken: req.csrfToken?.()
+        errors: [{ msg: 'Invalid email or password' }]
       });
     }
 
@@ -115,8 +125,7 @@ router.post('/login', async (req, res) => {
       if (err) {
         logger.error('Session regeneration error on login: %o', err);
         return res.render('auth/login', {
-          errors: [{ msg: 'Login failed. Please try again.' }],
-          csrfToken: req.csrfToken?.()
+          errors: [{ msg: 'Login failed. Please try again.' }]
         });
       }
 
@@ -135,8 +144,7 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     logger.error('Login error: %o', error);
     res.render('auth/login', {
-      errors: [{ msg: 'Login failed. Please try again.' }],
-      csrfToken: req.csrfToken?.()
+      errors: [{ msg: 'Login failed. Please try again.' }]
     });
   }
 });
@@ -163,8 +171,7 @@ router.get('/profile', (req, res) => {
   res.render('auth/profile', {
     user: req.session.user,
     errors: null,
-    success: null,
-    csrfToken: req.csrfToken?.()
+    success: null
   });
 });
 
@@ -191,16 +198,14 @@ router.post('/profile', async (req, res) => {
     res.render('auth/profile', {
       user: req.session.user,
       errors: null,
-      success: 'Profile updated successfully',
-      csrfToken: req.csrfToken?.()
+      success: 'Profile updated successfully'
     });
   } catch (error) {
     logger.error('Profile update error: %o', error);
     res.render('auth/profile', {
       user: req.session.user,
       errors: [{ msg: 'Profile update failed' }],
-      success: null,
-      csrfToken: req.csrfToken?.()
+      success: null
     });
   }
 });
