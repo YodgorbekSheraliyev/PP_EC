@@ -65,17 +65,19 @@ router.get("/users", async (req, res) => {
 router.post("/users/:id/role", async (req, res) => {
   try {
     const { role } = req.body;
-    const pool = require("../config/database");
+    const userId = req.params.id;
 
     if (!["customer", "admin"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    await pool.query(
-      "UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2",
-      [role, req.params.id]
-    );
-    res.json({ message: "User role updated" });
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await user.update({ role });
+    res.json({ message: "User role updated successfully" });
   } catch (error) {
     logger.error("Error updating user role: %o", error);
     res.status(500).json({ message: "Error updating user role" });

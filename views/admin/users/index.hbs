@@ -35,14 +35,12 @@
                         <td>{{username}}</td>
                         <td>{{email}}</td>
                         <td>
-                            {{#each role}}
-                                <span class="badge {{#if (eq this "admin")}}bg-danger{{else}}bg-secondary{{/if}}">{{this}}</span>
-                            {{/each}}
+                            <span class="badge {{#if (eq role "admin")}}bg-danger{{else}}bg-secondary{{/if}}">{{role}}</span>
                         </td>
                         <td>{{order_count}}</td>
                         <td>{{created_at}}</td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-primary" onclick="editRoles({{id}}, {{json role}})">Edit Roles</button>
+                            <button type="button" class="btn btn-sm btn-primary edit-role-btn" data-user-id="{{id}}" data-user-role="{{role}}">Edit Role</button>
                         </td>
                     </tr>
                     {{/each}}
@@ -64,21 +62,21 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="editRolesModalLabel">Edit User Roles</h5>
+                    <h5 class="modal-title" id="editRolesModalLabel">Edit User Role</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="editRolesForm">
                         <div class="mb-3">
-                            <label class="form-label">Select Roles:</label>
+                            <label class="form-label">Select Role:</label>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" value="customer" id="roleCustomer">
+                                <input class="form-check-input" type="radio" name="role" value="customer" id="roleCustomer">
                                 <label class="form-check-label" for="roleCustomer">
                                     Customer
                                 </label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" value="admin" id="roleAdmin">
+                                <input class="form-check-input" type="radio" name="role" value="admin" id="roleAdmin">
                                 <label class="form-check-label" for="roleAdmin">
                                     Admin
                                 </label>
@@ -88,7 +86,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveRoles()">Save Roles</button>
+                    <button type="button" class="btn btn-primary" id="saveRoleBtn">Save Role</button>
                 </div>
             </div>
         </div>
@@ -96,56 +94,133 @@
 
     <script>
         let currentUserId = null;
+        let editRoleModal = null;
 
-        function editRoles(userId, currentRoles) {
-            currentUserId = userId;
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📍 Page loaded - initializing');
 
-            // Reset checkboxes
-            document.getElementById('roleCustomer').checked = false;
-            document.getElementById('roleAdmin').checked = false;
-
-            // Set current roles
-            if (Array.isArray(currentRoles)) {
-                currentRoles.forEach(role => {
-                    if (role === 'customer') document.getElementById('roleCustomer').checked = true;
-                    if (role === 'admin') document.getElementById('roleAdmin').checked = true;
-                });
-            }
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('editRolesModal'));
-            modal.show();
-        }
-
-        async function saveRoles() {
-            const selectedRoles = [];
-            if (document.getElementById('roleCustomer').checked) selectedRoles.push('customer');
-            if (document.getElementById('roleAdmin').checked) selectedRoles.push('admin');
-
-            if (selectedRoles.length === 0) {
-                alert('At least one role must be selected');
+            // Initialize modal
+            const modalElement = document.getElementById('editRolesModal');
+            if (modalElement) {
+                editRoleModal = new bootstrap.Modal(modalElement);
+                console.log('✅ Modal initialized');
+            } else {
+                console.error('❌ Modal element not found');
                 return;
             }
 
+            // Add event listener to Save Role button
+            const saveBtn = document.getElementById('saveRoleBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔘 Save Role button clicked');
+                    saveRoles();
+                });
+                console.log('✅ Save Role button listener attached');
+            } else {
+                console.error('❌ Save Role button not found');
+            }
+
+            // Add event listeners to Edit Role buttons
+            const editRoleButtons = document.querySelectorAll('.edit-role-btn');
+            console.log('📊 Found ' + editRoleButtons.length + ' Edit Role buttons');
+
+            editRoleButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const userId = this.dataset.userId;
+                    const userRole = this.dataset.userRole;
+                    console.log('🔘 Edit button clicked - userId:', userId, 'userRole:', userRole);
+                    editRoles(userId, userRole);
+                });
+            });
+        });
+
+        function editRoles(userId, currentRole) {
             try {
+                console.log('📝 editRoles called with userId:', userId, 'currentRole:', currentRole);
+                currentUserId = userId;
+
+                // Reset radio buttons
+                document.getElementById('roleCustomer').checked = false;
+                document.getElementById('roleAdmin').checked = false;
+
+                // Set current role
+                if (typeof currentRole === 'string') {
+                    if (currentRole === 'customer') {
+                        document.getElementById('roleCustomer').checked = true;
+                        console.log('✅ Set role to customer');
+                    } else if (currentRole === 'admin') {
+                        document.getElementById('roleAdmin').checked = true;
+                        console.log('✅ Set role to admin');
+                    }
+                }
+
+                // Show modal
+                if (editRoleModal) {
+                    editRoleModal.show();
+                    console.log('✅ Modal shown for user ' + currentUserId);
+                } else {
+                    console.error('❌ Modal not initialized when trying to show');
+                }
+            } catch (error) {
+                console.error('❌ Error in editRoles:', error);
+                alert('Error opening edit role modal: ' + error.message);
+            }
+        }
+
+        async function saveRoles() {
+            try {
+                console.log('💾 saveRoles function called');
+                console.log('📍 currentUserId:', currentUserId);
+
+                const selectedRole = document.querySelector('input[name="role"]:checked')?.value;
+                console.log('📍 selectedRole:', selectedRole);
+
+                if (!selectedRole) {
+                    console.warn('⚠️ No role selected');
+                    alert('Please select a role');
+                    return;
+                }
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                console.log('🔐 CSRF Token present:', !!csrfToken);
+
+                const requestBody = { role: selectedRole };
+                console.log('📤 Sending request with body:', requestBody);
+                console.log('🌐 Fetch URL: /admin/users/' + currentUserId + '/role');
+
                 const response = await fetch(`/admin/users/${currentUserId}/role`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        'x-csrf-token': csrfToken || ''
                     },
-                    body: JSON.stringify({ roles: selectedRoles })
+                    body: JSON.stringify(requestBody)
                 });
 
+                console.log('📬 Response received - Status:', response.status);
+
+                const responseData = await response.json();
+                console.log('📋 Response data:', responseData);
+
                 if (response.ok) {
-                    location.reload();
+                    console.log('✅ Update successful');
+                    // Close modal and reload
+                    editRoleModal.hide();
+                    alert('User role updated successfully!');
+                    setTimeout(() => location.reload(), 500);
                 } else {
-                    const error = await response.json();
-                    alert('Error updating user roles: ' + error.message);
+                    console.error('❌ Update failed with status', response.status);
+                    alert('Error updating user role: ' + (responseData.message || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Error:', error);
-                alert('Error updating user roles');
+                console.error('❌ Error in saveRoles:', error);
+                console.error('Error details:', error.stack);
+                alert('Error: ' + error.message);
             }
         }
     </script>
