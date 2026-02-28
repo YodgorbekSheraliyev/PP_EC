@@ -1,0 +1,36 @@
+# JMeter Results - Don't commit test results to version control
+results/
+*.csv
+*.log
+*.jtl
+
+# JMeter temporary files
+bak/
+*.tmp
+*.jmx.tmp
+
+# IDE specific
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Large files
+*.zip
+*.tar
+*.tar.gz
+
+# Documentation generated files (keep source)
+results/*-report/
+**/*.html
+!/*.md
+
+# Keep templates and configuration
+!test-plans/
+!config/
+!scripts/
+!*.md
