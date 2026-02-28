@@ -9,6 +9,7 @@
     "test": "jest",
     "test:unit": "jest tests/unit --coverage",
     "test:integration": "jest tests/integration",
+    "test:security": "jest tests/security --coverage",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --coverageDirectory=./coverage",
     "lint": "eslint .",
