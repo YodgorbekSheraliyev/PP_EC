@@ -49,26 +49,32 @@ const testConfigs = {
 
 // API endpoints to test
 const endpoints = [
-  { method: 'GET', path: '/api/products', name: 'Get Products', weight: 30 },
-  { method: 'GET', path: '/api/products/1', name: 'Get Product Detail', weight: 20 },
-  { method: 'POST', path: '/api/cart', name: 'Add to Cart', weight: 15 },
-  { method: 'GET', path: '/api/cart', name: 'Get Cart', weight: 15 },
-  { method: 'POST', path: '/api/orders', name: 'Create Order', weight: 10 },
-  { method: 'GET', path: '/api/orders', name: 'Get Orders', weight: 10 }
+  { method: 'GET', path: '/products', name: 'Get Products' },
+  { method: 'GET', path: '/cart', name: 'Get Cart' },
+  { method: 'GET', path: '/orders', name: 'Get Orders' }
 ];
 
 /**
  * Generate a JMeter test plan XML
  */
 function generateTestPlan(testType, config) {
-  const threadGroupName = `${config.name} - Thread Group`;
-
-  // Generate HTTP sampler elements
-  let httpSamplers = '';
-  endpoints.forEach((endpoint, index) => {
-    const isPost = endpoint.method === 'POST';
-    httpSamplers += generateHttpSampler(endpoint, index);
-  });
+  const httpSamplers = endpoints.map((ep, i) => `
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="${ep.name}" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain">localhost</stringProp>
+          <stringProp name="HTTPSampler.port">3000</stringProp>
+          <stringProp name="HTTPSampler.protocol">http</stringProp>
+          <stringProp name="HTTPSampler.method">${ep.method}</stringProp>
+          <stringProp name="HTTPSampler.path">${ep.path}</stringProp>
+          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+          <stringProp name="HTTPSampler.response_timeout">10000</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree/>`).join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
@@ -87,30 +93,26 @@ function generateTestPlan(testType, config) {
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
     </TestPlan>
     <hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="${threadGroupName}" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">1</stringProp>
+          <stringProp name="LoopController.loops">-1</stringProp>
         </elementProp>
         <stringProp name="ThreadGroup.num_threads">${config.threads}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${config.rampUp}</stringProp>
-        <elementProp name="ThreadGroup.duration_assertion" elementType="DurationAssertion" guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Duration Time" enabled="true">
-          <stringProp name="DurationAssertion.milliseconds">${config.duration * 1000}</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">-1</stringProp>
         </elementProp>
-        <stringProp name="ThreadGroup.delay_startup">0</stringProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${config.duration}</stringProp>
-        <stringProp name="ThreadGroup.scheduler">true</stringProp>
-        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.delay">0</stringProp>
       </ThreadGroup>
       <hashTree>
         <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
           <elementProp name="Arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="timeout" elementType="Argument">
-                <stringProp name="Argument.name">timeout</stringProp>
-                <stringProp name="Argument.value">10000</stringProp>
-              </elementProp>
-            </collectionProp>
+            <collectionProp name="Arguments.arguments"/>
           </elementProp>
           <stringProp name="HTTPSampler.domain">localhost</stringProp>
           <stringProp name="HTTPSampler.port">3000</stringProp>
@@ -118,29 +120,24 @@ function generateTestPlan(testType, config) {
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
           <stringProp name="HTTPSampler.path"></stringProp>
           <stringProp name="HTTPSampler.concurrentPool">4</stringProp>
+          <boolProp name="HTTPSampler.image_parser">false</boolProp>
+          <boolProp name="HTTPSampler.concurrentPool">4</boolProp>
         </ConfigTestElement>
         <hashTree/>
-        ${generateSimpleController(endpoints)}
-        <hashTree>
-          ${httpSamplers}
-          <hashTree>
-            <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
-              <elementProp name="Arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-                <collectionProp name="Arguments.arguments"/>
-              </elementProp>
-              <stringProp name="filename"></stringProp>
-              <boolProp name="ResultCollector.error_logging">false</boolProp>
-              <boolProp name="ResultCollector.success_only">false</boolProp>
-              <boolProp name="ResultCollector.properties">false</boolProp>
-              <boolProp name="ResultCollector.child_nodes">false</boolProp>
-              <stringProp name="ResultCollector.label"></stringProp>
-              <stringProp name="ResultCollector.filename_variable"></stringProp>
-            </ResultCollector>
-            <hashTree/>
-            <Summariser guiclass="SummaryReport" testclass="Summariser" testname="Generate Summary Results" enabled="true"/>
-            <hashTree/>
-          </hashTree>
-        </hashTree>
+${httpSamplers}
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+          <elementProp name="Arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="filename"></stringProp>
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <boolProp name="ResultCollector.success_only">false</boolProp>
+          <boolProp name="ResultCollector.properties">false</boolProp>
+          <boolProp name="ResultCollector.child_nodes">false</boolProp>
+          <stringProp name="ResultCollector.label"></stringProp>
+          <stringProp name="ResultCollector.filename_variable"></stringProp>
+        </ResultCollector>
+        <hashTree/>
       </hashTree>
     </hashTree>
   </hashTree>
@@ -150,58 +147,11 @@ function generateTestPlan(testType, config) {
 }
 
 /**
- * Generate a Simple Controller for grouping requests
- */
-function generateSimpleController(endpoints) {
-  return `<GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="API Requests" enabled="true"/>`;
-}
-
-/**
- * Generate an HTTP Sampler for an endpoint
- */
-function generateHttpSampler(endpoint, index) {
-  const method = endpoint.method;
-  const isPost = method === 'POST';
-
-  const bodyData = isPost ? `<elementProp name="Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="quantity" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">true</boolProp>
-                <stringProp name="Argument.name">quantity</stringProp>
-                <stringProp name="Argument.value">1</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-                <boolProp name="HTTPArgument.use_equals">true</boolProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>` : '';
-
-  return `<HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="${endpoint.name}" enabled="true">
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-            <collectionProp name="Arguments.arguments"/>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain">localhost</stringProp>
-          <stringProp name="HTTPSampler.port">3000</stringProp>
-          <stringProp name="HTTPSampler.protocol">http</stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${endpoint.path}</stringProp>
-          <stringProp name="HTTPSampler.method">${method}</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">10000</stringProp>
-        </HTTPSamplerProxy>`;
-}
-
-/**
  * Save test plan to file
  */
 function saveTestPlan(testType, xml) {
   const testPlansDir = path.join(__dirname, '..', 'jmeter', 'test-plans');
 
-  // Create directory if it doesn't exist
   if (!fs.existsSync(testPlansDir)) {
     fs.mkdirSync(testPlansDir, { recursive: true });
   }
@@ -222,8 +172,8 @@ function main() {
   Object.entries(testConfigs).forEach(([testType, config]) => {
     try {
       const xml = generateTestPlan(testType, config);
-      const filename = saveTestPlan(testType, xml);
-      console.log(`✅ Created: ${path.basename(filename)}`);
+      saveTestPlan(testType, xml);
+      console.log(`✅ Created: ${testType}-test.jmx`);
       console.log(`   Config: ${config.threads} users, ${config.rampUp}s ramp-up, ${config.duration}s duration`);
       count++;
     } catch (error) {
@@ -231,10 +181,8 @@ function main() {
     }
   });
 
-  console.log(`\n✅ Generated ${count} test plans in jmeter/test-plans/\n`);
-  console.log('📝 Next steps:');
-  console.log('   npm run test:load:smoke    - Run 5-min smoke test');
-  console.log('   npm run test:load          - Run 15-min ramp-up test\n');
+  console.log(`\n✅ Generated ${count} test plans\n`);
+  console.log('📝 Next: npm run test:load:smoke\n');
 }
 
 main();
