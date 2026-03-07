@@ -5,11 +5,7 @@
  * Usage: node scripts/seed.js
  */
 
-const User = require('../models/User');
-const Product = require('../models/Product');
-const Cart = require('../models/Cart');
-const Order = require('../models/Order');
-const OrderItem = require('../models/OrderItem');
+const { User, Product, Cart, Order, OrderItem, sequelize } = require('../models');
 const { connectDB } = require('../config/sequelize');
 const logger = require('../utils/logger');
 
@@ -190,9 +186,15 @@ const sampleProducts = [
 const sampleUsers = [
   {
     username: 'admin_user',
-    email: 'admin@secureshop.com',
-    password: 'AdminPass123!',
+    email: 'admin@example.com',
+    password: 'Admin123!@#',
     role: 'admin'
+  },
+  {
+    username: 'testuser',
+    email: 'newtestuser@example.com',
+    password: 'Test123!@#',
+    role: 'customer'
   },
   {
     username: 'johndoe',
@@ -211,12 +213,6 @@ const sampleUsers = [
     email: 'bob@example.com',
     password: 'BobPass123!',
     role: 'customer'
-  },
-  {
-    username: 'alicejohnson',
-    email: 'alice@example.com',
-    password: 'AlicePass123!',
-    role: 'customer'
   }
 ];
 
@@ -231,11 +227,12 @@ async function seedDatabase() {
 
     // Clear existing data (use with caution in production!)
     console.log('🗑️  Clearing existing data...');
-    await OrderItem.destroy({ where: {}, truncate: true });
-    await Order.destroy({ where: {}, truncate: true });
-    await Cart.destroy({ where: {}, truncate: true });
-    await Product.destroy({ where: {}, truncate: true });
-    await User.destroy({ where: {}, truncate: true });
+    // Clear in order of foreign key dependencies (reverse of creation)
+    await OrderItem.destroy({ where: {} });
+    await Cart.destroy({ where: {} });
+    await Order.destroy({ where: {} });
+    await Product.destroy({ where: {} });
+    await User.destroy({ where: {} });
     console.log('✅ Data cleared\n');
 
     // Create users
@@ -319,13 +316,13 @@ async function seedDatabase() {
     // Display login credentials
     console.log('📝 Test Credentials:');
     console.log('   Admin:');
-    console.log('   └─ Email: admin@secureshop.com');
-    console.log('   └─ Password: AdminPass123!');
+    console.log('   └─ Email: admin@example.com');
+    console.log('   └─ Password: Admin123!@#');
     console.log('   └─ Role: Admin');
     console.log('');
-    console.log('   Customer:');
-    console.log('   └─ Email: john@example.com');
-    console.log('   └─ Password: JohnPass123!');
+    console.log('   Test User:');
+    console.log('   └─ Email: newtestuser@example.com');
+    console.log('   └─ Password: Test123!@#');
     console.log('   └─ Role: Customer');
     console.log('');
 
