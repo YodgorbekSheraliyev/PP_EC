@@ -89,14 +89,16 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category;
 
-    const products = await Product.findAllWithFilters(limit, offset, category);
+    const products = await Product.findAllWithFilters(limit + 1, offset, category);
+    const hasNextPage = products.length > limit;
     const categories = await Product.getCategories();
 
     res.render('products/index', {
-      products,
+      products: products.slice(0, limit),
       categories,
       currentCategory: category,
       currentPage: page,
+      hasNextPage,
       user: req.session.user
     });
   } catch (error) {

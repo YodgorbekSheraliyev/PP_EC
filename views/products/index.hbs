@@ -102,7 +102,7 @@
                         <li class="page-item active">
                             <span class="page-link">{{currentPage}}</span>
                         </li>
-                        {{#if (lt products.length 12)}}
+                        {{#if hasNextPage}}
                         <li class="page-item">
                             <a class="page-link" href="/products?page={{add currentPage 1}}{{#if currentCategory}}&category={{currentCategory}}{{/if}}">Next</a>
                         </li>
