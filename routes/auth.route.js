@@ -193,7 +193,7 @@ router.post('/profile', async (req, res) => {
       email: updatedUser.email
     };
 
-    logger.info(`User profile updated: ${email}, IP: ${req.ip}`);
+    logger.info(`User profile updated: ${updatedUser.email}, IP: ${req.ip}`);
 
     res.render('auth/profile', {
       user: req.session.user,
