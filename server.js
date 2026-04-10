@@ -8,6 +8,7 @@ const path = require("path");
 const hbs = require("hbs");
 const { connectDB } = require("./config/sequelize");
 const { validateEnv } = require("./config/env");
+const { Cart } = require("./models");
 const { requireHTTPS, setHSTSHeader } = require("./middleware/httpsRedirect");
 const { csrfProtection, csrfErrorHandler, injectCsrfToken } = require("./middleware/csrf");
 const logger = require("./utils/logger");
@@ -133,33 +134,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware to set cart item count for authenticated users (only on key routes)
-// TODO: Optimize this - currently disabled to prevent performance issues
-// app.use((req, res, next) => {
-//   if (req.session.user && ['/','/', '/products', '/cart', '/orders', '/admin'].some(p => req.path.startsWith(p))) {
-//     const Cart = require('./models/Cart');
-//     Cart.getCartItemCount(req.session.user.id)
-//       .then(itemCount => {
-//         res.locals.itemCount = itemCount;
-//         next();
-//       })
-//       .catch(error => {
-//         logger.error('Error fetching cart count:', {
-//           userId: req.session.user.id,
-//           error: error.message
-//         });
-//         res.locals.itemCount = 0;
-//         next();
-//       });
-//   } else {
-//     res.locals.itemCount = 0;
-//     next();
-//   }
-// });
-
+// Middleware to set cart item count for authenticated users
 app.use((req, res, next) => {
-  res.locals.itemCount = 0;
-  next();
+  if (req.session && req.session.user) {
+    Cart.getCartItemCount(req.session.user.id)
+      .then(itemCount => {
+        res.locals.itemCount = itemCount;
+        next();
+      })
+      .catch(error => {
+        logger.error('Error fetching cart count:', { userId: req.session.user.id, error: error.message });
+        res.locals.itemCount = 0;
+        next();
+      });
+  } else {
+    res.locals.itemCount = 0;
+    next();
+  }
 });
 
 // Request logging middleware
