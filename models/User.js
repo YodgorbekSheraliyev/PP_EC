@@ -110,13 +110,12 @@ class User extends Model {
   }
 
   static async updateProfile(id, updates) {
-    const { username, email } = updates;
+    const { username } = updates;
 
     try {
       const user = await this.findByPk(id);
       if (user) {
         user.username = username;
-        user.email = email;
         await user.save();
         return user;
       }

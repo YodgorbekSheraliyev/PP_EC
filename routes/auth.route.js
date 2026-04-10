@@ -181,10 +181,10 @@ router.post('/profile', async (req, res) => {
   }
 
   try {
-    const { username, email } = req.body;
+    const { username } = req.body;
     const userId = req.session.user.id;
 
-    const updatedUser = await User.updateProfile(userId, { username, email });
+    const updatedUser = await User.updateProfile(userId, { username });
 
     // Update session
     req.session.user = {
