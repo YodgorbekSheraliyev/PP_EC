@@ -8,7 +8,7 @@ This document provides detailed API endpoint reference for the SecureShop E-Comm
 
 ```
 Development: http://localhost:5000
-Production: https://your-domain.com
+Production: https://some-domain.com
 ```
 
 ## Authentication

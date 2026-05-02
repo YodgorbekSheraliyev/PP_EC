@@ -43,8 +43,8 @@
                                 <input type="text" class="form-control" id="username" name="username" value="{{user.username}}" required minlength="3" maxlength="50">
                             </div>
                             <div class="mb-3">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="email" name="email" value="{{user.email}}" required>
+                                <label class="form-label">Email Address</label>
+                                <input type="email" class="form-control" value="{{user.email}}" disabled>
                             </div>
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary">Update Profile</button>
