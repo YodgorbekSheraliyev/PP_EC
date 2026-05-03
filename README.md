@@ -155,7 +155,7 @@ Copy the generated keys to your `.env` file.
 Edit `.env` file with your configuration:
 
 ```env
-DATABASE_URL=postgresql://your_username:your_password@localhost:5432/ecommerce_db
+DATABASE_URL=postgresql://username:password@localhost:5432/ecommerce_db
 SESSION_SECRET=<generated-session-secret>
 JWT_SECRET=<generated-jwt-secret>
 NODE_ENV=development
@@ -485,7 +485,7 @@ This project is licensed under the ISC License.
 
 ## 📧 Support
 
-For support, email Y.Sheraliyev@wlv.ac.uk or open an issue in the repository.
+For support, email Y.Sheraliyev@wlv.ac.uk / yodgorbeksheraliyev777@gmail.com or open an issue in the repository.
 
 ---
 
